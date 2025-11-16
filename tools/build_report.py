@@ -33,6 +33,48 @@ def md_table(df: pd.DataFrame) -> str:
         return "```\n" + df.to_string(index=False) + "\n```\n\n"
 
 
+def append_indicator_formulas(rep: list) -> None:
+    rep.append(md_h2("Формулы индикаторов"))
+    # Краткие формулы/определения. Неформатированный блок для удобства чтения в GitHub.
+    formulas = r"""
+Y (цель): dClose_t = Close_{t+1} − Close_t
+
+Value: денежный оборот за бар (MOEX Value).
+
+SMA_n: SMA_n(t) = mean(Close_{t−n+1..t})  (n ∈ {5,10,20})
+EMA_n: EMA_n(t) = α·Close_t + (1−α)·EMA_n(t−1),  α = 2/(n+1)  (n ∈ {5,10,20})
+
+BB (Bollinger, n=20, k=2):
+  BBH = SMA_20 + 2·σ_20,   BBL = SMA_20 − 2·σ_20
+
+RSI_50: RSI = 100 − 100/(1 + RS),  RS = EMA(Gain,50)/EMA(Loss,50)
+
+Stochastics (окно n):
+  %K = 100·(Close − L_n)/(H_n − L_n),  %D = SMA(%K, 3)
+  H_n = max(High_{t−n+1..t}),  L_n = min(Low_{t−n+1..t})
+
+ATR_50: ATR = RMA(TR,50),  TR_t = max(High−Low, |High−Close_{t−1}|, |Low−Close_{t−1}|)
+
+OBV: OBV_t = OBV_{t−1} + sign(Close_t − Close_{t−1})·Volume_t
+
+MACD: MACD = EMA_12(Close) − EMA_26(Close)
+MACD_SIGNAL = EMA_9(MACD),  MACD_DIFF = MACD − MACD_SIGNAL
+
+ADX_14: ADX = RMA(DX,14),  DX = 100·|+DI − −DI|/(+DI + −DI)
+  +DI, −DI получаются из +DM, −DM и TR по схеме Уайлдера
+
+CCI_20: CCI = (TP − SMA(TP,20)) / (0.015·MD_20),  TP=(H+L+C)/3,
+  MD_20 = mean(|TP − SMA(TP,20)|) за 20 баров
+
+ROC_10: ROC = 100·(Close_t/Close_{t−10} − 1)
+WILLR_14: −100·(H_14 − Close)/(H_14 − L_14)
+
+Лаги цены: lag_k = Close_{t−k},  k = 1..60
+Лаги экзогенных факторов: Brent_lag_k, USD_lag_k, KeyRate_lag_k = соответствующий уровень на t−k,  k = 1..24
+"""
+    rep.append("```\n" + formulas.strip() + "\n```\n\n")
+
+
 def _regen_all_models_from_preds(pred_dir: str, out_dir: str, paths: Paths, timep: TimeParams) -> None:
     """Перестроить all_models графики по сохранённым предсказаниям (без повторного обучения)."""
     apply_gost_style()
@@ -247,6 +289,55 @@ def main():
             "Список ограничен десятью ключевыми факторами.\n\n"
         )
         rep.append(md_table(agg.head(10)))
+
+        # Визуализации топ-5 важнейших признаков (overall и по моделям)
+        apply_gost_style()
+        os.makedirs(rep_dir := os.path.join(out_dir, "reports"), exist_ok=True)
+        import matplotlib.pyplot as _plt
+        import seaborn as _sns
+        _sns.set_theme(style="whitegrid")
+
+        # Overall top-5
+        top_overall = agg.head(5)
+        fig, ax = _plt.subplots(figsize=(8, 4))
+        _sns.barplot(
+            data=top_overall,
+            y="Feature",
+            x="Importance",
+            palette="Blues_r",
+            ax=ax,
+        )
+        ax.set_title("Топ‑5 факторов (средняя важность)")
+        ax.set_xlabel("Mean importance")
+        ax.set_ylabel("")
+        fig.tight_layout()
+        fi_overall_path = os.path.join(rep_dir, "feature_importance_top5_overall.png")
+        fig.savefig(fi_overall_path, bbox_inches="tight")
+        _plt.close(fig)
+        rep.append(f"![feature_importance_top5_overall](outputs/reports/{os.path.basename(fi_overall_path)})\n\n")
+
+        # Per-model top-5 (RF, CatBoost if присутствуют)
+        if "Model" in fi.columns:
+            for mdl in sorted(fi["Model"].unique()):
+                mdi = fi[fi["Model"] == mdl].groupby("Feature")["Importance"].mean().reset_index().sort_values("Importance", ascending=False).head(5)
+                if mdi.empty:
+                    continue
+                fig, ax = _plt.subplots(figsize=(8, 4))
+                _sns.barplot(data=mdi, y="Feature", x="Importance", palette="Greens_r", ax=ax)
+                ax.set_title(f"Топ‑5 факторов ({mdl})")
+                ax.set_xlabel("Mean importance")
+                ax.set_ylabel("")
+                fig.tight_layout()
+                path_m = os.path.join(rep_dir, f"feature_importance_top5_{mdl}.png")
+                fig.savefig(path_m, bbox_inches="tight")
+                _plt.close(fig)
+                rep.append(f"![feature_importance_top5_{mdl}](outputs/reports/{os.path.basename(path_m)})\n\n")
+
+        # Добавим формулы индикаторов ниже этого раздела
+        append_indicator_formulas(rep)
+    else:
+        # Если важности не найдены, всё равно добавим формулы индикаторов
+        append_indicator_formulas(rep)
 
     analysis_dir = os.path.join(out_dir, "imoex_analysis")
     if os.path.isdir(analysis_dir):

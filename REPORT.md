@@ -96,6 +96,51 @@ MACD_SIGNAL    0.019985
      ADX_14    0.018952
 ```
 
+![feature_importance_top5_overall](outputs/reports/feature_importance_top5_overall.png)
+
+![feature_importance_top5_CatBoost](outputs/reports/feature_importance_top5_CatBoost.png)
+
+![feature_importance_top5_RF](outputs/reports/feature_importance_top5_RF.png)
+
+## Формулы индикаторов
+
+```
+Y (цель): dClose_t = Close_{t+1} − Close_t
+
+Value: денежный оборот за бар (MOEX Value).
+
+SMA_n: SMA_n(t) = mean(Close_{t−n+1..t})  (n ∈ {5,10,20})
+EMA_n: EMA_n(t) = α·Close_t + (1−α)·EMA_n(t−1),  α = 2/(n+1)  (n ∈ {5,10,20})
+
+BB (Bollinger, n=20, k=2):
+  BBH = SMA_20 + 2·σ_20,   BBL = SMA_20 − 2·σ_20
+
+RSI_50: RSI = 100 − 100/(1 + RS),  RS = EMA(Gain,50)/EMA(Loss,50)
+
+Stochastics (окно n):
+  %K = 100·(Close − L_n)/(H_n − L_n),  %D = SMA(%K, 3)
+  H_n = max(High_{t−n+1..t}),  L_n = min(Low_{t−n+1..t})
+
+ATR_50: ATR = RMA(TR,50),  TR_t = max(High−Low, |High−Close_{t−1}|, |Low−Close_{t−1}|)
+
+OBV: OBV_t = OBV_{t−1} + sign(Close_t − Close_{t−1})·Volume_t
+
+MACD: MACD = EMA_12(Close) − EMA_26(Close)
+MACD_SIGNAL = EMA_9(MACD),  MACD_DIFF = MACD − MACD_SIGNAL
+
+ADX_14: ADX = RMA(DX,14),  DX = 100·|+DI − −DI|/(+DI + −DI)
+  +DI, −DI получаются из +DM, −DM и TR по схеме Уайлдера
+
+CCI_20: CCI = (TP − SMA(TP,20)) / (0.015·MD_20),  TP=(H+L+C)/3,
+  MD_20 = mean(|TP − SMA(TP,20)|) за 20 баров
+
+ROC_10: ROC = 100·(Close_t/Close_{t−10} − 1)
+WILLR_14: −100·(H_14 − Close)/(H_14 − L_14)
+
+Лаги цены: lag_k = Close_{t−k},  k = 1..60
+Лаги экзогенных факторов: Brent_lag_k, USD_lag_k, KeyRate_lag_k = соответствующий уровень на t−k,  k = 1..24
+```
+
 ## Цепной анализ IMOEX
 
 Сводка по месячным цепным приращениям (фрагмент):
