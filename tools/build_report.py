@@ -62,24 +62,66 @@ def _regen_all_models_from_preds(pred_dir: str, out_dir: str, paths: Paths, time
         hist = hist.iloc[-400:]
 
         fig, ax = plt.subplots(figsize=(16, 5))
-        ax.plot(hist.index, hist.values, label="Факт (до прогноза)", color="black", linewidth=2.4)
-        ax.plot(dt_fc, dfp["y_true"], label="Факт (прогнозный отрезок)", color="#1f77b4", linewidth=2.6)
+        # Reserve space on the right for an external legend
+        plt.subplots_adjust(right=0.78)
+        # Fact series with distinct, fixed colors
+        ax.plot(
+            hist.index,
+            hist.values,
+            label="Факт (до прогноза)",
+            color="black",
+            linewidth=2.4,
+            solid_capstyle="round",
+            solid_joinstyle="round",
+        )
+        fact_fc_color = "#1f77b4"  # matplotlib default blue
+        ax.plot(
+            dt_fc,
+            dfp["y_true"],
+            label="Факт (прогнозный отрезок)",
+            color=fact_fc_color,
+            linewidth=2.6,
+            solid_capstyle="round",
+            solid_joinstyle="round",
+        )
+        # Model overlays — ensure palette avoids black/blue to prevent confusion
         base_cols = {"Datetime", "y_true", "Close", "Close_prev", "Sigma"}
         cols = [c for c in dfp.columns if c not in base_cols]
-        palette = sns.color_palette("tab10", n_colors=max(len(cols), 3))
+        def _close(c1, c2, tol=0.03):
+            return all(abs(a - b) <= tol for a, b in zip(c1, c2))
+        reserved = [(0.0, 0.0, 0.0), (0.1216, 0.4667, 0.7059)]  # black, default blue
+        pal_raw = sns.color_palette("tab20", n_colors=max(len(cols) + 4, 12))
+        palette = [c for c in pal_raw if not any(_close(c, r) for r in reserved)]
+        if len(palette) < len(cols):
+            palette.extend(sns.color_palette("hls", n_colors=(len(cols) - len(palette) + 3)))
         for idx, c in enumerate(cols):
-            ax.plot(dt_fc, dfp[c], label=f"Прогноз {c}", linewidth=2.6, alpha=0.9, solid_capstyle="round", color=palette[idx % len(palette)])
-        ax.axvline(start_fc, color="#666666", linestyle="--", linewidth=1.4, label="Старт прогноза")
+            ax.plot(
+                dt_fc,
+                dfp[c],
+                label=f"Прогноз {c}",
+                linewidth=2.2,
+                alpha=0.95,
+                solid_capstyle="round",
+                solid_joinstyle="round",
+                color=palette[idx % len(palette)],
+            )
+        ax.axvline(start_fc, color="#666666", linestyle="--", linewidth=1.3, label="Старт прогноза")
         ax.set_title(f"{tk}: факт и прогнозы всех моделей (фолд {pf.split('_f')[1].split('.')[0]})")
         ax.set_xlabel("Дата и время (UTC)")
         ax.set_ylabel("ΔЦена")
         ax.xaxis.set_major_locator(matplotlib.dates.AutoDateLocator())
         ax.xaxis.set_major_formatter(matplotlib.dates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
-        ax.legend()
+        # Smaller legend outside the axes to avoid overlap
+        lg = ax.legend(fontsize=9, loc="upper left", bbox_to_anchor=(1.01, 1), borderaxespad=0.0, frameon=True)
         fig.autofmt_xdate()
         fig.tight_layout()
+        # Save under current name and a compatibility name used earlier
         out_path = os.path.join(out_dir, f"{pf.replace('.csv','')}_all_models.png")
-        fig.savefig(out_path)
+        compat_name = f"{tk}_{pf.replace('.csv','')}_all_models.png"
+        out_path_compat = os.path.join(out_dir, compat_name)
+        fig.savefig(out_path, bbox_inches="tight")
+        # also write the legacy/duplicate name for users expecting it
+        fig.savefig(out_path_compat, bbox_inches="tight")
         plt.close(fig)
 
 

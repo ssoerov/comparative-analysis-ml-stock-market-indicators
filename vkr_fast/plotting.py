@@ -16,7 +16,7 @@ def apply_gost_style():
             "grid.alpha": 0.5,
             "legend.frameon": True,
             "legend.framealpha": 0.9,
-            "legend.fontsize": 11,
+            "legend.fontsize": 10,
             "axes.spines.top": False,
             "axes.spines.right": False,
         }

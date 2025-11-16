@@ -169,9 +169,9 @@ mean_structural_shift_pct  0.836874
 
 ![IMOEX_IMOEX_f3_all_models.png](reports/IMOEX_IMOEX_f3_all_models.png)
 
-![IMOEX_f0_actual_vs_CatBoost.png](reports/IMOEX_f0_actual_vs_CatBoost.png)
+![IMOEX_IMOEX_f4_all_models.png](reports/IMOEX_IMOEX_f4_all_models.png)
 
-![IMOEX_f0_actual_vs_Hybrid.png](reports/IMOEX_f0_actual_vs_Hybrid.png)
+![IMOEX_f0_actual_vs_CatBoost.png](reports/IMOEX_f0_actual_vs_CatBoost.png)
 
 ## Факт и прогноз на всём горизонте (все фолды)
 
