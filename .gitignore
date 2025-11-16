@@ -1,0 +1,12 @@
+.venv/
+venv/
+__pycache__/
+.mpl/
+.mpl-cache/
+# outputs are tracked now for report reproducibility
+saved_models/
+catboost_info/
+data_cache/
+*.zip
+*.pyc
+.DS_Store
