@@ -357,11 +357,56 @@ def main():
                 if s.empty:
                     continue
                 fig, ax = _plt.subplots(figsize=(11, 4))
-                ax.plot(s.index, s.values, label=feat, color="#1f77b4", linewidth=2.2, solid_capstyle="round", solid_joinstyle="round")
+                # Основной ряд: индикатор
+                ax.plot(
+                    s.index,
+                    s.values,
+                    label=feat,
+                    color="#1f77b4",
+                    linewidth=2.2,
+                    solid_capstyle="round",
+                    solid_joinstyle="round",
+                )
+                # Вторичная ось: оборот Value
+                if "Value" in ind_df.columns:
+                    v = ind_df["Value"].loc[s.index].astype(float)
+                    ax2 = ax.twinx()
+                    ax2.grid(False)
+                    ax2.plot(
+                        v.index,
+                        v.values,
+                        label="Value",
+                        color="#ff7f0e",
+                        linewidth=1.6,
+                        alpha=0.7,
+                        solid_capstyle="round",
+                        solid_joinstyle="round",
+                    )
+                    ax2.set_ylabel("Value")
+                    # Совмещённая легенда
+                    lines = ax.get_lines() + ax2.get_lines()
+                    labels = [ln.get_label() for ln in lines]
+                    ax.legend(lines, labels, loc="upper left", fontsize=9)
+                else:
+                    ax.legend(loc="upper left", fontsize=9)
+
+                # Подпись метрик индикатора (среднее и σ)
+                mu = float(s.mean())
+                sd = float(s.std())
+                ax.text(
+                    0.99,
+                    0.98,
+                    f"μ = {mu:.3g}\nσ = {sd:.3g}",
+                    transform=ax.transAxes,
+                    ha="right",
+                    va="top",
+                    fontsize=9,
+                    bbox=dict(facecolor="white", edgecolor="#666666", alpha=0.8, boxstyle="round,pad=0.3"),
+                )
+
                 ax.set_title(f"{tk}: временной ряд индикатора {feat}")
                 ax.set_xlabel("Дата и время (UTC)")
                 ax.set_ylabel(feat)
-                ax.legend(loc="upper left", fontsize=9)
                 fig.autofmt_xdate()
                 fig.tight_layout()
                 fname = f"indicator_series_{feat}.png"
