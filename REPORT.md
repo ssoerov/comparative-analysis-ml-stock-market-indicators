@@ -102,6 +102,18 @@ MACD_SIGNAL    0.019985
 
 ![feature_importance_top5_RF](outputs/reports/feature_importance_top5_RF.png)
 
+## Временные ряды топ‑5 индикаторов
+
+![RSI_50](outputs/reports/indicator_series_RSI_50.png)
+
+![MACD_DIFF](outputs/reports/indicator_series_MACD_DIFF.png)
+
+![CCI_20](outputs/reports/indicator_series_CCI_20.png)
+
+![ROC_10](outputs/reports/indicator_series_ROC_10.png)
+
+![StochK](outputs/reports/indicator_series_StochK.png)
+
 ## Формулы индикаторов
 
 ```

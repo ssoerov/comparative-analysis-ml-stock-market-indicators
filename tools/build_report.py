@@ -10,6 +10,7 @@ from vkr_fast.mpl_config import configure_matplotlib
 from vkr_fast.plotting import apply_gost_style
 from vkr_fast.config import Paths, TimeParams, TICKERS
 from vkr_fast.data import fetch_moex
+from vkr_fast.features import add_indicators
 
 configure_matplotlib()
 
@@ -332,6 +333,42 @@ def main():
                 fig.savefig(path_m, bbox_inches="tight")
                 _plt.close(fig)
                 rep.append(f"![feature_importance_top5_{mdl}](outputs/reports/{os.path.basename(path_m)})\n\n")
+
+        # Построим отдельные временные ряды топ‑5 индикаторов (по важности среди индикаторов)
+        indicator_names = [
+            "SMA_5","SMA_10","SMA_20","EMA_5","EMA_10","EMA_20","BBH","BBL","RSI_50",
+            "StochK","StochD","ATR_50","OBV","MACD","MACD_SIGNAL","MACD_DIFF","ADX_14","CCI_20","ROC_10","WILLR_14"
+        ]
+        agg_ind = agg[agg["Feature"].isin(indicator_names)].head(5)
+        if not agg_ind.empty:
+            rep.append(md_h2("Временные ряды топ‑5 индикаторов"))
+            # загрузим историю IMOEX и рассчитаем индикаторы без сети (из кэша)
+            tk = "IMOEX"
+            moex = fetch_moex(
+                paths.cache_dir, tk, *TICKERS[tk], timep.start_raw, timep.end_raw, timep.interval_minutes, use_cache_only=True
+            )
+            ind_df = add_indicators(moex)
+            ts_slice = slice(timep.period_start, timep.period_end)
+            os.makedirs(rep_dir, exist_ok=True)
+            import matplotlib.pyplot as _plt
+            apply_gost_style()
+            for feat in agg_ind["Feature"].tolist():
+                s = ind_df[feat].loc[ts_slice].dropna()
+                if s.empty:
+                    continue
+                fig, ax = _plt.subplots(figsize=(11, 4))
+                ax.plot(s.index, s.values, label=feat, color="#1f77b4", linewidth=2.2, solid_capstyle="round", solid_joinstyle="round")
+                ax.set_title(f"{tk}: временной ряд индикатора {feat}")
+                ax.set_xlabel("Дата и время (UTC)")
+                ax.set_ylabel(feat)
+                ax.legend(loc="upper left", fontsize=9)
+                fig.autofmt_xdate()
+                fig.tight_layout()
+                fname = f"indicator_series_{feat}.png"
+                fpath = os.path.join(rep_dir, fname)
+                fig.savefig(fpath, bbox_inches="tight")
+                _plt.close(fig)
+                rep.append(f"![{feat}](outputs/reports/{fname})\n\n")
 
         # Добавим формулы индикаторов ниже этого раздела
         append_indicator_formulas(rep)
