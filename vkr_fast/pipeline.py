@@ -395,16 +395,16 @@ def run_pipeline(
             cut = timep.window
             y_eval = y_te[cut:]
             preds = {"RF": p_rf[cut:], "SARIMAX": p_sar[cut:]}
-            # Naive baselines
-            naive = np.zeros_like(y_eval)
-            y_full = np.concatenate([y_tr, y_te])
-            test_start = len(y_tr) + cut
+            # Naive baselines (train-only, без утечек)
+            # Простая наивная: последняя dClose из train, держим константой на горизонте
+            naive = np.full_like(y_eval, fill_value=y_tr[-1])
+            # Сезонная наивная: берём train-историю на лаг season_lag, без доступа к test
             lag = max(0, int(season_lag))
-            if lag > 0:
-                idx = np.arange(len(y_eval)) + test_start - lag
-                seas = np.where(idx >= 0, y_full[idx], 0.0)
+            if lag > 0 and len(y_tr) >= 1:
+                base_idx = np.arange(len(y_eval)) + len(y_tr) - lag
+                seas = np.take(y_tr, base_idx, mode="wrap")
             else:
-                seas = np.zeros_like(y_eval)
+                seas = np.full_like(y_eval, fill_value=y_tr[-1])
             preds["Naive"] = naive
             preds["sNaive"] = seas
             if use_catboost and p_cb is not None:
