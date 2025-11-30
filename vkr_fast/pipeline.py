@@ -416,7 +416,11 @@ def run_pipeline(
                 preds.update({"LSTM_base": p_lb, "LSTM_att": p_la, "Hybrid": p_h})
 
             eps = 1e-8
-            mase_denom = float(np.mean(np.abs(y_tr))) + eps
+            # MASE denominator: средняя абсолютная ошибка одношагового наивного прогноза на train
+            if len(y_tr) > 1:
+                mase_denom = float(np.mean(np.abs(np.diff(y_tr)))) + eps
+            else:
+                mase_denom = float(np.mean(np.abs(y_tr))) + eps
             for name, y_hat in preds.items():
                 mae = MAE(y_eval, y_hat)
                 rmse = math.sqrt(MSE(y_eval, y_hat))
