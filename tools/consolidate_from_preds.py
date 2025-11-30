@@ -93,11 +93,11 @@ def main():
         else:
             close_seq = np.concatenate(([close_curr[0]], close_curr))
         dt = pd.to_datetime(df['Datetime']).values
-        # Relative MASE denominator from sNaive baseline (if present)
+        # MASE denominator: MAE одношагового наивного прогноза (lag1) на этой выборке
         mase_denom = None
-        if 'sNaive' in df.columns:
+        if 'Naive' in df.columns:
             try:
-                mase_denom = float(MAE(y, df['sNaive'].values))
+                mase_denom = float(MAE(y, df['Naive'].values))
                 if mase_denom == 0:
                     mase_denom = None
             except Exception:
@@ -112,10 +112,7 @@ def main():
             wape = float(np.sum(np.abs(y - yhat)) / (np.sum(np.abs(y)) + eps) * 100)
             smape = float(np.mean(200.0 * np.abs(y - yhat) / (np.abs(y) + np.abs(yhat) + eps)))
             mdape = float(np.median(np.abs((y[mask] - yhat[mask]) / y[mask]) * 100)) if mask.any() else float("nan")
-            if mase_denom is not None and np.isfinite(mase_denom):
-                mase = float(mae / mase_denom)
-            else:
-                mase = float('nan')
+            mase = float(mae / mase_denom) if (mase_denom is not None and np.isfinite(mase_denom) and mase_denom > 0) else float('nan')
             met_rows.append([tk, fold, mdl, mae, rmse, mape, wape, smape, mdape, mase])
             cumret, maxdd = econ_from_preds(close_seq, yhat, dt, fee=args.fee, threshold=args.threshold, slippage=args.slippage)
             eco_rows.append([tk, fold, mdl, cumret, maxdd])

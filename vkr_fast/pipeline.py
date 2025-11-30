@@ -405,7 +405,6 @@ def run_pipeline(
             # Сезонная наивная: значение dClose с лагом season_lag из train+test истории
             lag = max(1, int(season_lag))
             seas_idx = np.arange(len(y_eval)) + start_idx - lag
-            # Для ранних индексов, выходящих за пределы, используем последнее значение train
             seas = np.where(seas_idx >= 0, y_full[seas_idx], y_tr[-1])
 
             preds["Naive"] = naive
@@ -421,17 +420,19 @@ def run_pipeline(
                 mase_denom = float(np.mean(np.abs(np.diff(y_tr)))) + eps
             else:
                 mase_denom = float(np.mean(np.abs(y_tr))) + eps
+            baseline_mae = float(MAE(y_eval, naive)) + eps
             for name, y_hat in preds.items():
+                err = y_eval - y_hat
                 mae = MAE(y_eval, y_hat)
                 rmse = math.sqrt(MSE(y_eval, y_hat))
                 mask = np.abs(y_eval) > eps
-                mape = float(np.mean(np.abs((y_eval[mask] - y_hat[mask]) / y_eval[mask])) * 100) if mask.any() else float("nan")
-                wape = float(np.sum(np.abs(y_eval - y_hat)) / (np.sum(np.abs(y_eval)) + eps) * 100)
-                smape = float(np.mean(200.0 * np.abs(y_eval - y_hat) / (np.abs(y_eval) + np.abs(y_hat) + eps)))
-                mdape = float(np.median(np.abs((y_eval[mask] - y_hat[mask]) / y_eval[mask]) * 100)) if mask.any() else float("nan")
-                mase = float(mae / mase_denom)
+                mape = float(np.mean(np.abs(err[mask] / y_eval[mask])) * 100) if mask.any() else float("nan")
+                wape = float(np.sum(np.abs(err)) / (np.sum(np.abs(y_eval)) + eps) * 100)
+                smape = float(np.mean(200.0 * np.abs(err) / (np.abs(y_eval) + np.abs(y_hat) + eps)))
+                mdape = float(np.median(np.abs(err[mask] / y_eval[mask]) * 100)) if mask.any() else float("nan")
+                mase = float(mae / baseline_mae) if baseline_mae > 0 else float("nan")
                 metrics_rows.append([tk, fold, name, mae, rmse, mape, wape, smape, mdape, mase])
-                err_rows.extend([[tk, name, e] for e in y_eval - y_hat])
+                err_rows.extend([[tk, name, e] for e in err])
                 losses = _per_point_losses(y_eval, y_hat, eps=eps)
                 for metric_key, series in losses.items():
                     loss_bucket[(tk, name)][metric_key].extend(series.tolist())
