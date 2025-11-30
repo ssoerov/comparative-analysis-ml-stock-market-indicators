@@ -269,13 +269,18 @@ def main():
         best_wape = res.loc[res.groupby("Tk")["WAPE"].idxmin()].reset_index(drop=True)
         rep.append(md_table(best_wape))
 
-    # DM tests
-    dm_path = os.path.join(cons_dir, "dm_test_pairs_all.csv")
+    # DM tests (по метрикам)
+    dm_path = os.path.join(cons_dir, "dm_test_pairs_metrics.csv")
     if os.path.exists(dm_path):
         dm = pd.read_csv(dm_path)
         if "Tk" in dm.columns:
             dm = dm[dm["Tk"] == "IMOEX"].reset_index(drop=True)
-        rep.append(md_h2("Попарные DM-тесты"))
+        rep.append(md_h2("Попарные DM-тесты по метрикам"))
+        # показываем только MAE/RMSE/MAPE/WAPE/sMAPE/MdAPE, если много — отсортировать по p
+        keep = ["MAE","RMSE","MAPE","WAPE","SMAPE","MDAPE"]
+        if "Metric" in dm.columns:
+            dm = dm[dm["Metric"].isin(keep)]
+            dm = dm.sort_values(["Metric", "p_val"])
         rep.append(md_table(dm))
 
     feat_imp_path = os.path.join(out_dir, "feature_importance.csv")

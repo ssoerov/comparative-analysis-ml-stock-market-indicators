@@ -9,30 +9,36 @@ def dm_test(
     e2: np.ndarray,
     h: int = 1,
     loss: str = "mse",
+    input_is_loss: bool = False,
 ):
-    """Diebold–Mariano test on comparable loss series.
+    """Diebold–Mariano test on comparable loss series or precomputed losses.
 
     Parameters
     ----------
-    e1, e2 : arrays of forecast errors (same length or will be aligned)
+    e1, e2 : arrays of forecast errors (same length or will be aligned), or loss arrays if input_is_loss=True
     h : forecast horizon (used for HAC bandwidth)
-    loss : currently supports "mse" (squared error) and "mae" (absolute error)
+    loss : currently supports "mse" (squared error) and "mae" (absolute error) when input_is_loss=False
+    input_is_loss : if True, treat e1/e2 as already computed loss series (no transformation)
     """
-    e1 = np.asarray(e1, dtype=float).ravel()
-    e2 = np.asarray(e2, dtype=float).ravel()
-    L = min(len(e1), len(e2))
-    if L == 0:
-        return float("nan"), float("nan")
-    e1 = e1[:L]
-    e2 = e2[:L]
-
-    if loss.lower() == "mae":
-        l1 = np.abs(e1)
-        l2 = np.abs(e2)
+    if input_is_loss:
+        l1 = np.asarray(e1, dtype=float).ravel()
+        l2 = np.asarray(e2, dtype=float).ravel()
     else:
-        # Default to squared-error loss (unbiased DM for regression forecasts)
-        l1 = np.square(e1)
-        l2 = np.square(e2)
+        e1 = np.asarray(e1, dtype=float).ravel()
+        e2 = np.asarray(e2, dtype=float).ravel()
+        L = min(len(e1), len(e2))
+        if L == 0:
+            return float("nan"), float("nan")
+        e1 = e1[:L]
+        e2 = e2[:L]
+
+        if loss.lower() == "mae":
+            l1 = np.abs(e1)
+            l2 = np.abs(e2)
+        else:
+            # Default to squared-error loss (unbiased DM for regression forecasts)
+            l1 = np.square(e1)
+            l2 = np.square(e2)
 
     d = l1 - l2
     n = len(d)

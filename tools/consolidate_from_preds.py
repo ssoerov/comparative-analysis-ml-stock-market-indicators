@@ -3,6 +3,7 @@ import re
 import math
 from glob import glob
 from typing import List, Dict
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,38 @@ sys.path.append(os.getcwd())
 from vkr_fast.utils.metrics import dm_test
 
 import argparse
+
+
+DM_METRICS = ("mae", "rmse", "mape", "wape", "smape", "mdape")
+
+
+def _per_point_losses(y_true, y_pred, eps: float = 1e-8) -> Dict[str, np.ndarray]:
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    diff = y_true - y_pred
+    abs_err = np.abs(diff)
+    denom = np.abs(y_true)
+    mask = denom > eps
+    return {
+        "mae": abs_err,
+        "rmse": diff ** 2,
+        "mape": np.where(mask, abs_err / denom * 100.0, np.nan),
+        "wape": np.where(mask, abs_err / denom * 100.0, np.nan),
+        "smape": 200.0 * abs_err / (np.abs(y_true) + np.abs(y_pred) + eps),
+        "mdape": np.where(mask, abs_err / denom * 100.0, np.nan),
+    }
+
+
+def _align_losses(l1: np.ndarray, l2: np.ndarray):
+    a1 = np.asarray(l1, dtype=float).ravel()
+    a2 = np.asarray(l2, dtype=float).ravel()
+    L = min(len(a1), len(a2))
+    if L == 0:
+        return np.array([]), np.array([])
+    a1 = a1[:L]
+    a2 = a2[:L]
+    mask = np.isfinite(a1) & np.isfinite(a2)
+    return a1[mask], a2[mask]
 
 
 
@@ -42,7 +75,7 @@ def main():
 
     met_rows: List[List] = []
     eco_rows: List[List] = []
-    err_bucket: Dict[tuple, List[float]] = {}
+    loss_bucket = defaultdict(lambda: {m: [] for m in DM_METRICS})
 
     pat = re.compile(r'.*/([A-Z]+)_f(\d+)\.csv$')
     for pf in pred_files:
@@ -86,7 +119,9 @@ def main():
             met_rows.append([tk, fold, mdl, mae, rmse, mape, wape, smape, mdape, mase])
             cumret, maxdd = econ_from_preds(close_seq, yhat, dt, fee=args.fee, threshold=args.threshold, slippage=args.slippage)
             eco_rows.append([tk, fold, mdl, cumret, maxdd])
-            err_bucket.setdefault((tk, mdl), []).extend((y - yhat).tolist())
+            losses = _per_point_losses(y, yhat, eps=eps)
+            for metric_key, series in losses.items():
+                loss_bucket[(tk, mdl)][metric_key].extend(series.tolist())
 
     # Save consolidated metrics
     mdf = pd.DataFrame(met_rows, columns=["Tk","Fold","Model","MAE","RMSE","MAPE","WAPE","sMAPE","MdAPE","MASE"])
@@ -97,25 +132,28 @@ def main():
 
     # Sharpe CI removed per request
 
-    # Pairwise DM tests across all models per ticker on aggregated errors
+    # Pairwise DM tests across all models per ticker and per metric on aggregated losses
     pair_rows = []
-    by_tk: Dict[str, Dict[str, np.ndarray]] = {}
-    for (tk, mdl), errs in err_bucket.items():
-        by_tk.setdefault(tk, {})[mdl] = np.asarray(errs)
+    by_tk: Dict[str, Dict[str, Dict[str, List[float]]]] = {}
+    for (tk, mdl), losses in loss_bucket.items():
+        by_tk.setdefault(tk, {})[mdl] = losses
+
     for tk, mdict in by_tk.items():
         models = sorted(mdict.keys())
-        for i in range(len(models)):
-            for j in range(i+1, len(models)):
-                m1, m2 = models[i], models[j]
-                e1, e2 = mdict[m1], mdict[m2]
-                L = min(len(e1), len(e2))
-                if L < 5:
-                    continue
-                s, p = dm_test(e1[:L], e2[:L])
-                pair_rows.append([tk, m1, m2, s, p])
+        for metric_key in DM_METRICS:
+            for i in range(len(models)):
+                for j in range(i+1, len(models)):
+                    m1, m2 = models[i], models[j]
+                    l1 = mdict[m1].get(metric_key, [])
+                    l2 = mdict[m2].get(metric_key, [])
+                    l1, l2 = _align_losses(l1, l2)
+                    if len(l1) < 5:
+                        continue
+                    s, p = dm_test(l1, l2, input_is_loss=True)
+                    pair_rows.append([tk, m1, m2, metric_key.upper(), s, p])
     if pair_rows:
-        pd.DataFrame(pair_rows, columns=["Tk","Model1","Model2","DM_stat","p_val"]).to_csv(
-            'outputs/consolidated/dm_test_pairs_all.csv', index=False
+        pd.DataFrame(pair_rows, columns=["Tk","Model1","Model2","Metric","DM_stat","p_val"]).to_csv(
+            'outputs/consolidated/dm_test_pairs_metrics.csv', index=False
         )
 
     print('Consolidation complete: outputs/consolidated/*.csv')

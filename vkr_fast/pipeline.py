@@ -1,6 +1,7 @@
 import json
 import math
 import os
+from collections import defaultdict
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -39,6 +40,40 @@ from .models.garch import fit_garch, forecast_garch
 from .utils import dm_test, block_bootstrap_means
 from .reporting import generate_reports
 from .analysis import chain_growth_report, cluster_regimes_for_ticker
+
+DM_METRICS = ("mae", "rmse", "mape", "wape", "smape", "mdape")
+
+
+def _per_point_losses(y_true: np.ndarray, y_pred: np.ndarray, eps: float = 1e-8) -> Dict[str, np.ndarray]:
+    """Compute per-point losses for metrics used in DM tests."""
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    diff = y_true - y_pred
+    abs_err = np.abs(diff)
+    denom = np.abs(y_true)
+    mask = denom > eps
+    losses = {
+        "mae": abs_err,
+        "rmse": diff ** 2,
+        "mape": np.where(mask, abs_err / denom * 100.0, np.nan),
+        "wape": np.where(mask, abs_err / denom * 100.0, np.nan),
+        "smape": 200.0 * abs_err / (np.abs(y_true) + np.abs(y_pred) + eps),
+        "mdape": np.where(mask, abs_err / denom * 100.0, np.nan),
+    }
+    return losses
+
+
+def _align_losses(l1: np.ndarray, l2: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Align two loss series to equal length and drop non-finite pairs."""
+    a1 = np.asarray(l1, dtype=float).ravel()
+    a2 = np.asarray(l2, dtype=float).ravel()
+    L = min(len(a1), len(a2))
+    if L == 0:
+        return np.array([]), np.array([])
+    a1 = a1[:L]
+    a2 = a2[:L]
+    mask = np.isfinite(a1) & np.isfinite(a2)
+    return a1[mask], a2[mask]
 
 
 def _load_all_data(paths: Paths, timep: TimeParams, cpu: int, logger, offline: bool = False, tickers=None) -> Dict[str, pd.DataFrame]:
@@ -158,6 +193,7 @@ def run_pipeline(
     econ_rows: List[List] = []
     err_rows: List[List] = []
     feature_rows: List[List] = []
+    loss_bucket = defaultdict(lambda: {m: [] for m in DM_METRICS})
 
     for tk in tmap:
         logger.info("================  %s  ================", tk)
@@ -389,6 +425,9 @@ def run_pipeline(
                 mase = float(mae / mase_denom)
                 metrics_rows.append([tk, fold, name, mae, rmse, mape, wape, smape, mdape, mase])
                 err_rows.extend([[tk, name, e] for e in y_eval - y_hat])
+                losses = _per_point_losses(y_eval, y_hat, eps=eps)
+                for metric_key, series in losses.items():
+                    loss_bucket[(tk, name)][metric_key].extend(series.tolist())
 
             # Save per-fold predictions for detailed reporting
             pred_dir = f"{paths.out_dir}/preds"
@@ -481,43 +520,50 @@ def run_pipeline(
         )
 
     err_df = pd.DataFrame(err_rows, columns=["Tk", "Mdl", "err"])
-    ci, dm = [], []
+    ci, dm_rows = [], []
     for (tk, mdl), g in err_df.groupby(["Tk", "Mdl"]):
         e = g["err"].values
         # Moving block bootstrap for time series errors (more realistic than i.i.d.)
         bs = block_bootstrap_means(e, B=600)
         ci.append([tk, mdl, *np.percentile(bs, [2.5, 50, 97.5])])
         if mdl != "Hybrid":
-            eh = err_df[(err_df["Tk"] == tk) & (err_df["Mdl"] == "Hybrid")]["err"].values
-            if len(eh) == 0:
+            h_losses = loss_bucket.get((tk, "Hybrid"), {})
+            if not h_losses:
                 continue
-            stat, p = dm_test(e, eh)
-            dm.append([tk, mdl, stat, p])
+            for metric_key in DM_METRICS:
+                l1, l2 = _align_losses(loss_bucket[(tk, mdl)].get(metric_key, []), h_losses.get(metric_key, []))
+                if len(l1) < 5:
+                    continue
+                stat, p = dm_test(l1, l2, input_is_loss=True)
+                dm_rows.append([tk, mdl, metric_key.upper(), stat, p])
 
     pd.DataFrame(ci, columns=["Tk", "Mdl", "CI_low", "CI_med", "CI_hi"]).to_csv(
         f"{paths.out_dir}/bootstrap_CI.csv", index=False
     )
-    pd.DataFrame(dm, columns=["Tk", "vs", "DM_stat", "p_val"]).to_csv(
-        f"{paths.out_dir}/dm_test.csv", index=False
-    )
+    if dm_rows:
+        pd.DataFrame(dm_rows, columns=["Tk", "vs", "Metric", "DM_stat", "p_val"]).to_csv(
+            f"{paths.out_dir}/dm_test.csv", index=False
+        )
 
-    # Pairwise DM tests across all available models per ticker
+    # Pairwise DM tests across all available models per ticker for each metric
     pair_rows = []
-    for tk, g_tk in err_df.groupby("Tk"):
-        models = sorted(g_tk["Mdl"].unique())
-        # Build error arrays per model
-        model_errs = {m: g_tk[g_tk["Mdl"] == m]["err"].values for m in models}
-        for i in range(len(models)):
-            for j in range(i + 1, len(models)):
-                m1, m2 = models[i], models[j]
-                e1, e2 = model_errs[m1], model_errs[m2]
-                L = min(len(e1), len(e2))
-                if L < 5:
-                    continue
-                s, p = dm_test(e1[:L], e2[:L])
-                pair_rows.append([tk, m1, m2, s, p])
+    for tk in tmap:
+        models = sorted({mdl for (tk_key, mdl) in loss_bucket.keys() if tk_key == tk})
+        if not models:
+            continue
+        for metric_key in DM_METRICS:
+            for i in range(len(models)):
+                for j in range(i + 1, len(models)):
+                    m1, m2 = models[i], models[j]
+                    l1 = loss_bucket[(tk, m1)].get(metric_key, [])
+                    l2 = loss_bucket[(tk, m2)].get(metric_key, [])
+                    l1, l2 = _align_losses(l1, l2)
+                    if len(l1) < 5:
+                        continue
+                    s, p = dm_test(l1, l2, input_is_loss=True)
+                    pair_rows.append([tk, m1, m2, metric_key.upper(), s, p])
     if pair_rows:
-        pd.DataFrame(pair_rows, columns=["Tk", "Model1", "Model2", "DM_stat", "p_val"]).to_csv(
+        pd.DataFrame(pair_rows, columns=["Tk", "Model1", "Model2", "Metric", "DM_stat", "p_val"]).to_csv(
             f"{paths.out_dir}/dm_test_pairs.csv", index=False
         )
 
