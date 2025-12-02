@@ -1,10 +1,11 @@
 import pandas as pd
+import numpy as np
 
 
 EXOG_COLUMNS = ("Brent", "USD", "KeyRate")
 
 
-def make_lags(df: pd.DataFrame, window: int, exog_lags: int = 24) -> pd.DataFrame:
+def make_lags(df: pd.DataFrame, window: int, exog_lags: int = 24, target: str = "dclose") -> pd.DataFrame:
     """Create supervised dataset with price and lagged exogenous features only.
 
     Parameters
@@ -17,7 +18,11 @@ def make_lags(df: pd.DataFrame, window: int, exog_lags: int = 24) -> pd.DataFram
         Number of historical lags per exogenous factor (Brent, USD, KeyRate).
     """
     out = df.copy()
-    out["dClose"] = out["Close"].diff().shift(-1)
+    target = target.lower()
+    if target == "logret":
+        out["y"] = (out["Close"].shift(-1) / out["Close"]).apply(lambda x: pd.NA if pd.isna(x) else float(np.log(x)))
+    else:
+        out["y"] = out["Close"].diff().shift(-1)
 
     # price lag embeddings
     timestamps = out.index[window:]
@@ -40,7 +45,7 @@ def make_lags(df: pd.DataFrame, window: int, exog_lags: int = 24) -> pd.DataFram
     if "Datetime" not in out.columns:
         if "index" in out.columns:
             out.rename(columns={"index": "Datetime"}, inplace=True)
-        elif out.columns[0] not in ("Close", "Open", "High", "Low", "Volume", "dClose"):
+        elif out.columns[0] not in ("Close", "Open", "High", "Low", "Volume", "y"):
             out.rename(columns={out.columns[0]: "Datetime"}, inplace=True)
         elif "begin" in out.columns:
             out.rename(columns={"begin": "Datetime"}, inplace=True)

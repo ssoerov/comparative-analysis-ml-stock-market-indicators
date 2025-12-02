@@ -80,6 +80,7 @@ def _regen_all_models_from_preds(pred_dir: str, out_dir: str, paths: Paths, time
     """Перестроить all_models графики по сохранённым предсказаниям (без повторного обучения)."""
     apply_gost_style()
     sns.set_theme(style="whitegrid")
+    allowed = {"LSTM_att", "CatBoost", "Hybrid"}
     for pf in sorted(f for f in os.listdir(pred_dir) if f.endswith(".csv")):
         if "_f" not in pf:
             continue
@@ -129,7 +130,7 @@ def _regen_all_models_from_preds(pred_dir: str, out_dir: str, paths: Paths, time
         )
         # Model overlays — ensure palette avoids black/blue to prevent confusion
         base_cols = {"Datetime", "y_true", "Close", "Close_prev", "Sigma"}
-        cols = [c for c in dfp.columns if c not in base_cols]
+        cols = [c for c in dfp.columns if c not in base_cols and c in allowed]
         def _close(c1, c2, tol=0.03):
             return all(abs(a - b) <= tol for a, b in zip(c1, c2))
         reserved = [(0.0, 0.0, 0.0), (0.1216, 0.4667, 0.7059)]  # black, default blue
@@ -149,9 +150,9 @@ def _regen_all_models_from_preds(pred_dir: str, out_dir: str, paths: Paths, time
                 color=palette[idx % len(palette)],
             )
         ax.axvline(start_fc, color="#666666", linestyle="--", linewidth=1.3, label="Старт прогноза")
-        ax.set_title(f"{tk}: факт и прогнозы всех моделей (фолд {pf.split('_f')[1].split('.')[0]})")
+        # без заголовка
         ax.set_xlabel("Дата и время (UTC)")
-        ax.set_ylabel("ΔЦена")
+        ax.set_ylabel("ΔЦена / logret")
         ax.xaxis.set_major_locator(matplotlib.dates.AutoDateLocator())
         ax.xaxis.set_major_formatter(matplotlib.dates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
         # Smaller legend outside the axes to avoid overlap
@@ -171,6 +172,7 @@ def _regen_all_models_from_preds(pred_dir: str, out_dir: str, paths: Paths, time
 def _full_period_plots(pred_dir: str, tk: str, out_dir: str) -> list:
     """Build full-period fact vs model plots using all folds."""
     apply_gost_style()
+    allowed = {"LSTM_att", "CatBoost", "Hybrid"}
     files = sorted([f for f in os.listdir(pred_dir) if f.startswith(f"{tk}_f") and f.endswith(".csv")])
     if not files:
         return []
@@ -180,7 +182,7 @@ def _full_period_plots(pred_dir: str, tk: str, out_dir: str) -> list:
         dt = pd.to_datetime(df["Datetime"], utc=True)
         base_cols = {"Datetime", "y_true", "Close", "Close_prev", "Sigma"}
         for col in df.columns:
-            if col in base_cols:
+            if col in base_cols or col not in allowed:
                 continue
             part = pd.DataFrame({"Datetime": dt, "y_true": df["y_true"], "y_hat": df[col]})
             model_series.setdefault(col, []).append(part)
@@ -191,9 +193,9 @@ def _full_period_plots(pred_dir: str, tk: str, out_dir: str) -> list:
         fig, ax = plt.subplots(figsize=(11, 4))
         ax.plot(full["Datetime"], full["y_true"], label="Факт (ΔЦена)")
         ax.plot(full["Datetime"], full["y_hat"], label=f"Прогноз ({mdl})")
-        ax.set_title(f"{tk}: факт и прогноз модели {mdl} на всём горизонте")
+        # без заголовка
         ax.set_xlabel("Дата и время (UTC)")
-        ax.set_ylabel("Изменение цены (ΔЦена)")
+        ax.set_ylabel("Изменение цены / logret")
         ax.legend()
         fig.autofmt_xdate()
         fig.tight_layout()
@@ -205,7 +207,11 @@ def _full_period_plots(pred_dir: str, tk: str, out_dir: str) -> list:
 
 
 def main():
-    out_dir = "outputs"
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--out-dir', default='outputs')
+    args = ap.parse_args()
+    out_dir = args.out_dir
     cons_dir = os.path.join(out_dir, "consolidated")
     paths = Paths()
     timep = TimeParams()
@@ -339,66 +345,62 @@ def main():
                 _plt.close(fig)
                 rep.append(f"![feature_importance_top5_{mdl}](outputs/reports/{os.path.basename(path_m)})\n\n")
 
-        # Построим отдельные временные ряды топ‑5 индикаторов (по важности среди индикаторов)
-        indicator_names = [
-            "SMA_5","SMA_10","SMA_20","EMA_5","EMA_10","EMA_20","BBH","BBL","RSI_50",
-            "StochK","StochD","ATR_50","OBV","MACD","MACD_SIGNAL","MACD_DIFF","ADX_14","CCI_20","ROC_10","WILLR_14"
-        ]
-        agg_ind = agg[agg["Feature"].isin(indicator_names)].head(5)
-        if not agg_ind.empty:
-            rep.append(md_h2("Временные ряды топ‑5 индикаторов"))
-            # загрузим историю IMOEX и рассчитаем индикаторы без сети (из кэша)
-            tk = "IMOEX"
-            moex = fetch_moex(
-                paths.cache_dir, tk, *TICKERS[tk], timep.start_raw, timep.end_raw, timep.interval_minutes, use_cache_only=True
-            )
-            ind_df = add_indicators(moex)
-            ts_slice = slice(timep.period_start, timep.period_end)
-            os.makedirs(rep_dir, exist_ok=True)
-            import matplotlib.pyplot as _plt
-            apply_gost_style()
-            for feat in agg_ind["Feature"].tolist():
-                s = ind_df[feat].loc[ts_slice].dropna()
-                if s.empty:
-                    continue
-                fig, ax = _plt.subplots(figsize=(11, 4))
-                # Основной ряд: индикатор
-                ax.plot(
-                    s.index,
-                    s.values,
-                    label=feat,
-                    color="#1f77b4",
-                    linewidth=2.2,
-                    solid_capstyle="round",
-                    solid_joinstyle="round",
+            # Построим отдельные временные ряды топ‑5 индикаторов (по важности среди индикаторов)
+            indicator_names = [
+                "SMA_5","SMA_10","SMA_20","EMA_5","EMA_10","EMA_20","BBH","BBL","RSI_50",
+                "StochK","StochD","ATR_50","OBV","MACD","MACD_SIGNAL","MACD_DIFF","ADX_14","CCI_20","ROC_10","WILLR_14"
+            ]
+            agg_ind = agg[agg["Feature"].isin(indicator_names)].head(5)
+            if not agg_ind.empty:
+                rep.append(md_h2("Временные ряды топ‑5 индикаторов"))
+                # загрузим историю IMOEX и рассчитаем индикаторы без сети (из кэша)
+                tk = "IMOEX"
+                moex = fetch_moex(
+                    paths.cache_dir, tk, *TICKERS[tk], timep.start_raw, timep.end_raw, timep.interval_minutes, use_cache_only=True
                 )
-                # Вторичная ось: оборот Value
+                ind_df = add_indicators(moex)
+                ts_slice = slice(timep.period_start, timep.period_end)
+                os.makedirs(rep_dir, exist_ok=True)
+                import matplotlib.pyplot as _plt
+                apply_gost_style()
+                # Отдельный график Value
                 if "Value" in ind_df.columns:
-                    v = ind_df["Value"].loc[s.index].astype(float)
-                    ax2 = ax.twinx()
-                    ax2.grid(False)
-                    ax2.plot(
-                        v.index,
-                        v.values,
-                        label="Value",
-                        color="#ff7f0e",
-                        linewidth=1.6,
-                        alpha=0.7,
+                    v = ind_df["Value"].loc[ts_slice].dropna()
+                    if not v.empty:
+                        fig, ax = _plt.subplots(figsize=(11, 4))
+                        ax.plot(v.index, v.values, label="Value", color="#ff7f0e", linewidth=1.8, alpha=0.8, solid_capstyle="round", solid_joinstyle="round")
+                        ax.set_xlabel("Дата и время (UTC)")
+                        ax.set_ylabel("Value")
+                        ax.legend(loc="upper left", fontsize=9)
+                        fig.autofmt_xdate()
+                        fig.tight_layout()
+                        fname_v = "indicator_series_Value.png"
+                        fpath_v = os.path.join(rep_dir, fname_v)
+                        fig.savefig(fpath_v, bbox_inches="tight")
+                        _plt.close(fig)
+                        rep.append(f"![Value](outputs/reports/{fname_v})\n\n")
+
+                for feat in agg_ind["Feature"].tolist():
+                    s = ind_df[feat].loc[ts_slice].dropna()
+                    if s.empty:
+                        continue
+                    fig, ax = _plt.subplots(figsize=(11, 4))
+                    # Основной ряд: индикатор
+                    ax.plot(
+                        s.index,
+                        s.values,
+                        label=feat,
+                        color="#1f77b4",
+                        linewidth=2.2,
                         solid_capstyle="round",
                         solid_joinstyle="round",
                     )
-                    ax2.set_ylabel("Value")
-                    # Совмещённая легенда
-                    lines = ax.get_lines() + ax2.get_lines()
-                    labels = [ln.get_label() for ln in lines]
-                    ax.legend(lines, labels, loc="upper left", fontsize=9)
-                else:
                     ax.legend(loc="upper left", fontsize=9)
 
-                # Подпись метрик индикатора (среднее и σ)
-                mu = float(s.mean())
-                sd = float(s.std())
-                ax.text(
+                    # Подпись метрик индикатора (среднее и σ)
+                    mu = float(s.mean())
+                    sd = float(s.std())
+                    ax.text(
                     0.99,
                     0.98,
                     f"μ = {mu:.3g}\nσ = {sd:.3g}",

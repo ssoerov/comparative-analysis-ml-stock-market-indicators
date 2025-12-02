@@ -67,8 +67,9 @@ def main():
     ap.add_argument('--fee', type=float, default=0.002)
     ap.add_argument('--slippage', type=float, default=0.0)
     ap.add_argument('--threshold', type=float, default=0.0)
+    ap.add_argument('--out-dir', default='outputs')
     args = ap.parse_args()
-    pred_files = sorted(glob('outputs/preds/*_f*.csv'))
+    pred_files = sorted(glob(f"{args.out_dir}/preds/*_f*.csv"))
     if not pred_files:
         print('No prediction files found in outputs/preds')
         return

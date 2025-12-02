@@ -46,6 +46,7 @@ def main():
     p.add_argument("--no-catboost", action="store_true", help="Disable CatBoost model")
     p.add_argument("--tickers", default="IMOEX", help="Comma-separated list of tickеров (только IMOEX поддерживается)")
     p.add_argument("--validate", action="store_true", help="Validate outputs after run")
+    p.add_argument("--target", default="dclose", choices=["dclose", "logret"], help="Целевая переменная: dclose=приращение цены, logret=лог-доходность")
 
     # GARCH options
     p.add_argument("--use-garch", action="store_true", help="Fit GARCH on SARIMAX residuals and use sigma")
@@ -57,7 +58,10 @@ def main():
 
     args = p.parse_args()
 
-    paths = Paths(data_dir=args.data_dir, cache_dir=args.cache_dir, out_dir=args.out_dir, model_dir=args.model_dir)
+    out_dir = args.out_dir
+    if args.target.lower() != "dclose":
+        out_dir = f"{out_dir}_{args.target.lower()}"
+    paths = Paths(data_dir=args.data_dir, cache_dir=args.cache_dir, out_dir=out_dir, model_dir=args.model_dir)
 
     def _tz(dt):
         import pandas as pd
@@ -100,6 +104,7 @@ def main():
         season_lag=args.season_lag,
         embargo_bars=args.embargo_bars,
         exog_lags=args.exog_lags,
+        target=args.target.lower(),
     )
 
     if args.validate:

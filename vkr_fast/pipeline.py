@@ -130,8 +130,8 @@ def _load_all_data(paths: Paths, timep: TimeParams, cpu: int, logger, offline: b
     return raw
 
 
-def _build_features(raw: Dict[str, pd.DataFrame], cpu: int, win: int, exog_lags: int) -> Dict[str, pd.DataFrame]:
-    feats = {tk: make_lags(add_indicators(raw[tk], n_jobs=cpu), window=win, exog_lags=exog_lags) for tk in raw}
+def _build_features(raw: Dict[str, pd.DataFrame], cpu: int, win: int, exog_lags: int, target: str) -> Dict[str, pd.DataFrame]:
+    feats = {tk: make_lags(add_indicators(raw[tk], n_jobs=cpu), window=win, exog_lags=exog_lags, target=target) for tk in raw}
     return feats
 
 
@@ -159,6 +159,7 @@ def run_pipeline(
     embargo_bars: int = 0,
     val_frac: float = 0.15,
     exog_lags: int = 24,
+    target: str = "dclose",
 ) -> None:
     ensure_dirs(paths)
     setup_environment()
@@ -179,12 +180,13 @@ def run_pipeline(
     raw = _load_all_data(paths, timep, cpu, logger, offline=offline, tickers=tmap)
 
     # Features
-    feats = _build_features(raw, cpu, timep.window, exog_lags=exog_lags)
+    target = target.lower()
+    feats = _build_features(raw, cpu, timep.window, exog_lags=exog_lags, target=target)
     sample_df = next(iter(feats.values()))
-    base_cols = {"Datetime", "dClose", "Close", "Open", "High", "Low", "Volume"}
+    base_cols = {"Datetime", "y", "Close", "Open", "High", "Low", "Volume"}
     feature_manifest = [c for c in sample_df.columns if c not in base_cols]
     with open(os.path.join(paths.out_dir, "feature_space.json"), "w", encoding="utf-8") as fh:
-        json.dump({"target": "dClose", "features": feature_manifest}, fh, ensure_ascii=False, indent=2)
+        json.dump({"target": "y", "target_kind": target, "features": feature_manifest}, fh, ensure_ascii=False, indent=2)
     analysis_dir = os.path.join(paths.out_dir, "imoex_analysis")
     analysis_done = set()
 
@@ -257,10 +259,10 @@ def run_pipeline(
                 )
                 continue
 
-            y_tr = tr["dClose"].values.astype("float32")
-            y_te = te["dClose"].values.astype("float32")
+            y_tr = tr["y"].values.astype("float32")
+            y_te = te["y"].values.astype("float32")
             from pandas.api.types import is_numeric_dtype
-            feat_cols = [c for c in tr.columns if c != "dClose" and is_numeric_dtype(tr[c])]
+            feat_cols = [c for c in tr.columns if c != "y" and is_numeric_dtype(tr[c])]
             X_tr = tr[feat_cols].values.astype("float32")
             X_te = te[feat_cols].values.astype("float32")
 
@@ -396,13 +398,13 @@ def run_pipeline(
             y_eval = y_te[cut:]
             preds = {"RF": p_rf[cut:], "SARIMAX": p_sar[cut:]}
             # Naive baselines (train-only, без утечек)
-            # Простая наивная: прогноз = фактический dClose предыдущего бара
+            # Простая наивная: прогноз = фактический dClose/logret предыдущего бара
             y_full = np.concatenate([y_tr, y_te])
             start_idx = len(y_tr) + cut  # позиция первого тестового прогноза в y_full
             naive_idx = np.arange(len(y_eval)) + start_idx - 1
             naive = y_full[naive_idx]
 
-            # Сезонная наивная: значение dClose с лагом season_lag из train+test истории
+            # Сезонная наивная: значение dClose/logret с лагом season_lag из train+test истории
             lag = max(1, int(season_lag))
             seas_idx = np.arange(len(y_eval)) + start_idx - lag
             seas = np.where(seas_idx >= 0, y_full[seas_idx], y_tr[-1])
@@ -499,7 +501,7 @@ def run_pipeline(
             try:
                 # История для общего графика: весь train + весь horizon
                 hist_dt = np.concatenate([tr[time_col].values, te[time_col].values])
-                hist_y = np.concatenate([tr["dClose"].values, te["dClose"].values])
+                hist_y = np.concatenate([tr["y"].values, te["y"].values])
                 fc_start_dt = te[time_col].values[cut] if len(te[time_col].values) > cut else hist_dt[-len(y_eval)]
                 generate_reports(
                     pred_df,

@@ -1,5 +1,6 @@
 {
-  "target": "dClose",
+  "target": "y",
+  "target_kind": "dclose",
   "features": [
     "Value",
     "SMA_5",
