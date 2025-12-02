@@ -80,7 +80,7 @@ def _regen_all_models_from_preds(pred_dir: str, out_dir: str, paths: Paths, time
     """Перестроить all_models графики по сохранённым предсказаниям (без повторного обучения)."""
     apply_gost_style()
     sns.set_theme(style="whitegrid")
-    allowed = {"LSTM_att", "CatBoost", "Hybrid"}
+    allowed = {"LSTM_att", "CatBoost", "Hybrid", "SARIMAX"}
     for pf in sorted(f for f in os.listdir(pred_dir) if f.endswith(".csv")):
         if "_f" not in pf:
             continue
@@ -152,7 +152,7 @@ def _regen_all_models_from_preds(pred_dir: str, out_dir: str, paths: Paths, time
         ax.axvline(start_fc, color="#666666", linestyle="--", linewidth=1.3, label="Старт прогноза")
         # без заголовка
         ax.set_xlabel("Дата и время (UTC)")
-        ax.set_ylabel("ΔЦена / logret")
+        ax.set_ylabel("Значение")
         ax.xaxis.set_major_locator(matplotlib.dates.AutoDateLocator())
         ax.xaxis.set_major_formatter(matplotlib.dates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
         # Smaller legend outside the axes to avoid overlap
@@ -172,7 +172,7 @@ def _regen_all_models_from_preds(pred_dir: str, out_dir: str, paths: Paths, time
 def _full_period_plots(pred_dir: str, tk: str, out_dir: str) -> list:
     """Build full-period fact vs model plots using all folds."""
     apply_gost_style()
-    allowed = {"LSTM_att", "CatBoost", "Hybrid"}
+    allowed = {"LSTM_att", "CatBoost", "Hybrid", "SARIMAX"}
     files = sorted([f for f in os.listdir(pred_dir) if f.startswith(f"{tk}_f") and f.endswith(".csv")])
     if not files:
         return []
@@ -195,7 +195,7 @@ def _full_period_plots(pred_dir: str, tk: str, out_dir: str) -> list:
         ax.plot(full["Datetime"], full["y_hat"], label=f"Прогноз ({mdl})")
         # без заголовка
         ax.set_xlabel("Дата и время (UTC)")
-        ax.set_ylabel("Изменение цены / logret")
+        ax.set_ylabel("Значение")
         ax.legend()
         fig.autofmt_xdate()
         fig.tight_layout()
@@ -210,8 +210,10 @@ def main():
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument('--out-dir', default='outputs')
+    ap.add_argument('--report-path', default='REPORT.md', help='Путь для сохранения markdown-отчёта')
     args = ap.parse_args()
     out_dir = args.out_dir
+    report_path = args.report_path
     cons_dir = os.path.join(out_dir, "consolidated")
     paths = Paths()
     timep = TimeParams()
@@ -258,10 +260,10 @@ def main():
             m = m[m["Tk"] == "IMOEX"].reset_index(drop=True)
         if "Tk" in e.columns:
             e = e[e["Tk"] == "IMOEX"].reset_index(drop=True)
-        cols = {"MAE":"mean","RMSE":"mean","MAPE":"mean","WAPE":"mean","sMAPE":"mean","MdAPE":"mean"}
+        cols = {"MAE": "mean", "RMSE": "mean"}
         if "MASE" in m.columns:
             cols["MASE"] = "mean"
-        m_agg = m.groupby(["Tk", "Model"]).agg(**{k:(k,v) for k,v in cols.items()}).reset_index()
+        m_agg = m.groupby(["Tk", "Model"]).agg(**{k: (k, v) for k, v in cols.items()}).reset_index()
         e_agg = e.groupby(["Tk", "Model"]).agg(CumRet=("CumRet", "mean"), MaxDD=("MaxDD", "mean")).reset_index()
         res = m_agg.merge(e_agg, on=["Tk", "Model"], how="left")
         rep.append(md_h2("Сводные метрики по тикерам и моделям"))
@@ -271,9 +273,10 @@ def main():
         best_mae = res.loc[res.groupby("Tk")["MAE"].idxmin()].reset_index(drop=True)
         rep.append(md_table(best_mae))
 
-        rep.append(md_h2("Лучшие модели по WAPE на тикер"))
-        best_wape = res.loc[res.groupby("Tk")["WAPE"].idxmin()].reset_index(drop=True)
-        rep.append(md_table(best_wape))
+        if "MASE" in res.columns:
+            rep.append(md_h2("Лучшие модели по MASE на тикер"))
+            best_mase = res.loc[res.groupby("Tk")["MASE"].idxmin()].reset_index(drop=True)
+            rep.append(md_table(best_mase))
 
     # DM tests (по метрикам)
     dm_path = os.path.join(cons_dir, "dm_test_pairs_metrics.csv")
@@ -401,26 +404,25 @@ def main():
                     mu = float(s.mean())
                     sd = float(s.std())
                     ax.text(
-                    0.99,
-                    0.98,
-                    f"μ = {mu:.3g}\nσ = {sd:.3g}",
-                    transform=ax.transAxes,
-                    ha="right",
-                    va="top",
-                    fontsize=9,
-                    bbox=dict(facecolor="white", edgecolor="#666666", alpha=0.8, boxstyle="round,pad=0.3"),
-                )
+                        0.99,
+                        0.98,
+                        f"μ = {mu:.3g}\nσ = {sd:.3g}",
+                        transform=ax.transAxes,
+                        ha="right",
+                        va="top",
+                        fontsize=9,
+                        bbox=dict(facecolor="white", edgecolor="#666666", alpha=0.8, boxstyle="round,pad=0.3"),
+                    )
 
-                ax.set_title(f"{tk}: временной ряд индикатора {feat}")
-                ax.set_xlabel("Дата и время (UTC)")
-                ax.set_ylabel(feat)
-                fig.autofmt_xdate()
-                fig.tight_layout()
-                fname = f"indicator_series_{feat}.png"
-                fpath = os.path.join(rep_dir, fname)
-                fig.savefig(fpath, bbox_inches="tight")
-                _plt.close(fig)
-                rep.append(f"![{feat}](outputs/reports/{fname})\n\n")
+                    ax.set_xlabel("Дата и время (UTC)")
+                    ax.set_ylabel(feat)
+                    fig.autofmt_xdate()
+                    fig.tight_layout()
+                    fname = f"indicator_series_{feat}.png"
+                    fpath = os.path.join(rep_dir, fname)
+                    fig.savefig(fpath, bbox_inches="tight")
+                    _plt.close(fig)
+                    rep.append(f"![{feat}](outputs/reports/{fname})\n\n")
 
         # Добавим формулы индикаторов ниже этого раздела
         append_indicator_formulas(rep)
@@ -501,7 +503,10 @@ def main():
         for f in sorted(imgs)[:6]:
             rep.append(f"![{f}](reports/{f})\n\n")
     # Full-period plots (все фолды)
-    full_figs = _full_period_plots(os.path.join(out_dir, "preds"), "IMOEX", rep_dir)
+    full_pred_dir = os.path.join(out_dir, "full_preds")
+    if not os.path.isdir(full_pred_dir):
+        full_pred_dir = os.path.join(out_dir, "preds")
+    full_figs = _full_period_plots(full_pred_dir, "IMOEX", rep_dir)
     if full_figs:
         rep.append(md_h2("Факт и прогноз на всём горизонте (все фолды)"))
         for p in full_figs:
@@ -509,7 +514,7 @@ def main():
             rep.append(f"![{os.path.basename(fname)}]({fname})\n\n")
 
     # Save report
-    with open("REPORT.md", "w", encoding="utf-8") as fh:
+    with open(report_path, "w", encoding="utf-8") as fh:
         fh.write("".join(rep))
     print("REPORT.md создан.")
 
@@ -529,7 +534,7 @@ def main():
         imgs = [f for f in os.listdir(eda_dir) if f.endswith('.png')]
         for f in sorted(imgs):
             eda.append(f"![{f}](outputs/eda/{f})\n\n")
-        with open("REPORT.md", "a", encoding="utf-8") as fh:
+        with open(report_path, "a", encoding="utf-8") as fh:
             fh.write("".join(eda))
 
     # Clustering section
@@ -549,7 +554,7 @@ def main():
             cl.append(f"![{f}](outputs/clustering/{f})\n\n")
         for f in sorted(pies):
             cl.append(f"![{f}](outputs/clustering/{f})\n\n")
-        with open("REPORT.md", "a", encoding="utf-8") as fh:
+        with open(report_path, "a", encoding="utf-8") as fh:
             fh.write("".join(cl))
 
     # VAR/VARMAX section
@@ -588,7 +593,7 @@ def main():
             var.append("Спектры модулей корней VAR — примеры:\n\n")
             for f in sorted(roots_imgs)[:5]:
                 var.append(f"![{f}](outputs/var/{f})\n\n")
-        with open("REPORT.md", "a", encoding="utf-8") as fh:
+        with open(report_path, "a", encoding="utf-8") as fh:
             fh.write("".join(var))
 
 

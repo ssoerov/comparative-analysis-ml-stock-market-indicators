@@ -69,9 +69,10 @@ def main():
     ap.add_argument('--threshold', type=float, default=0.0)
     ap.add_argument('--out-dir', default='outputs')
     args = ap.parse_args()
-    pred_files = sorted(glob(f"{args.out_dir}/preds/*_f*.csv"))
+    out_dir = args.out_dir
+    pred_files = sorted(glob(f"{out_dir}/preds/*_f*.csv"))
     if not pred_files:
-        print('No prediction files found in outputs/preds')
+        print(f'No prediction files found in {out_dir}/preds')
         return
 
     met_rows: List[List] = []
@@ -124,9 +125,10 @@ def main():
     # Save consolidated metrics
     mdf = pd.DataFrame(met_rows, columns=["Tk","Fold","Model","MAE","RMSE","MAPE","WAPE","sMAPE","MdAPE","MASE"])
     edf = pd.DataFrame(eco_rows, columns=["Tk","Fold","Model","CumRet","MaxDD"])
-    os.makedirs('outputs/consolidated', exist_ok=True)
-    mdf.to_csv('outputs/consolidated/metrics_all.csv', index=False)
-    edf.to_csv('outputs/consolidated/economics_all.csv', index=False)
+    cons_dir = os.path.join(out_dir, "consolidated")
+    os.makedirs(cons_dir, exist_ok=True)
+    mdf.to_csv(os.path.join(cons_dir, "metrics_all.csv"), index=False)
+    edf.to_csv(os.path.join(cons_dir, "economics_all.csv"), index=False)
 
     # Sharpe CI removed per request
 
@@ -151,10 +153,10 @@ def main():
                     pair_rows.append([tk, m1, m2, metric_key.upper(), s, p])
     if pair_rows:
         pd.DataFrame(pair_rows, columns=["Tk","Model1","Model2","Metric","DM_stat","p_val"]).to_csv(
-            'outputs/consolidated/dm_test_pairs_metrics.csv', index=False
+            os.path.join(cons_dir, "dm_test_pairs_metrics.csv"), index=False
         )
 
-    print('Consolidation complete: outputs/consolidated/*.csv')
+    print(f'Consolidation complete: {cons_dir}/*.csv')
 
 
 if __name__ == '__main__':

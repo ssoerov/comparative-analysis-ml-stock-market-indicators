@@ -16,7 +16,208 @@ $$r_t = \mu + \beta^\top X_{t-1} + \varepsilon_t, \qquad \sigma_t^2 = \omega + \
 Y=y | X1=Value | X2=SMA_5 | X3=SMA_10 | X4=SMA_20 | X5=EMA_5 | X6=EMA_10 | X7=EMA_20 | X8=BBH | X9=BBL | X10=RSI_50 | X11=StochK | X12=StochD | X13=ATR_50 | X14=OBV | X15=MACD | X16=MACD_SIGNAL | X17=MACD_DIFF | X18=ADX_14 | X19=CCI_20 | X20=ROC_10 | X21=WILLR_14 | X22=lag1 | X23=lag2 | X24=lag3 | X25=lag4 | X26=lag5 | X27=lag6 | X28=lag7 | X29=lag8 | X30=lag9 | X31=lag10 | X32=lag11 | X33=lag12 | X34=lag13 | X35=lag14 | X36=lag15 | X37=lag16 | X38=lag17 | X39=lag18 | X40=lag19 | X41=lag20 | X42=lag21 | X43=lag22 | X44=lag23 | X45=lag24 | X46=lag25 | X47=lag26 | X48=lag27 | X49=lag28 | X50=lag29 | X51=lag30 | X52=lag31 | X53=lag32 | X54=lag33 | X55=lag34 | X56=lag35 | X57=lag36 | X58=lag37 | X59=lag38 | X60=lag39 | X61=lag40 | X62=lag41 | X63=lag42 | X64=lag43 | X65=lag44 | X66=lag45 | X67=lag46 | X68=lag47 | X69=lag48 | X70=lag49 | X71=lag50 | X72=lag51 | X73=lag52 | X74=lag53 | X75=lag54 | X76=lag55 | X77=lag56 | X78=lag57 | X79=lag58 | X80=lag59 | X81=lag60 | X82=Brent_lag1 | X83=Brent_lag2 | X84=Brent_lag3 | X85=Brent_lag4 | X86=Brent_lag5 | X87=Brent_lag6 | X88=Brent_lag7 | X89=Brent_lag8 | X90=Brent_lag9 | X91=Brent_lag10 | X92=Brent_lag11 | X93=Brent_lag12 | X94=Brent_lag13 | X95=Brent_lag14 | X96=Brent_lag15 | X97=Brent_lag16 | X98=Brent_lag17 | X99=Brent_lag18 | X100=Brent_lag19 | X101=Brent_lag20 | X102=Brent_lag21 | X103=Brent_lag22 | X104=Brent_lag23 | X105=Brent_lag24 | X106=USD_lag1 | X107=USD_lag2 | X108=USD_lag3 | X109=USD_lag4 | X110=USD_lag5 | X111=USD_lag6 | X112=USD_lag7 | X113=USD_lag8 | X114=USD_lag9 | X115=USD_lag10 | X116=USD_lag11 | X117=USD_lag12 | X118=USD_lag13 | X119=USD_lag14 | X120=USD_lag15 | X121=USD_lag16 | X122=USD_lag17 | X123=USD_lag18 | X124=USD_lag19 | X125=USD_lag20 | X126=USD_lag21 | X127=USD_lag22 | X128=USD_lag23 | X129=USD_lag24 | X130=KeyRate_lag1 | X131=KeyRate_lag2 | X132=KeyRate_lag3 | X133=KeyRate_lag4 | X134=KeyRate_lag5 | X135=KeyRate_lag6 | X136=KeyRate_lag7 | X137=KeyRate_lag8 | X138=KeyRate_lag9 | X139=KeyRate_lag10 | X140=KeyRate_lag11 | X141=KeyRate_lag12 | X142=KeyRate_lag13 | X143=KeyRate_lag14 | X144=KeyRate_lag15 | X145=KeyRate_lag16 | X146=KeyRate_lag17 | X147=KeyRate_lag18 | X148=KeyRate_lag19 | X149=KeyRate_lag20 | X150=KeyRate_lag21 | X151=KeyRate_lag22 | X152=KeyRate_lag23 | X153=KeyRate_lag24
 ```
 
-Не найдены консолидированные файлы metrics_all.csv и economics_all.csv. Сначала запустите конвейер и консолидацию.
+## Сводные метрики по тикерам и моделям
+
+```
+   Tk     Model      MAE     RMSE     MASE    CumRet    MaxDD
+IMOEX  CatBoost 0.003127 0.004228 0.870724 -0.001007 0.014824
+IMOEX  LSTM_att 0.003210 0.004189 0.869474  0.003496 0.013247
+IMOEX    Hybrid 0.003263 0.004283 0.896682  0.007613 0.010841
+IMOEX LSTM_base 0.003294 0.004227 0.886787 -0.002349 0.016028
+IMOEX     Naive 0.003989 0.005196 1.000000  0.013969 0.007379
+IMOEX        RF 0.004165 0.005643 1.328187 -0.012052 0.022998
+IMOEX    sNaive 0.005578 0.008291 1.582572 -0.018469 0.025087
+IMOEX   SARIMAX 0.008003 0.008885 3.232721 -0.021525 0.023766
+```
+
+## Лучшие модели по MAE на тикер
+
+```
+   Tk    Model      MAE     RMSE     MASE    CumRet    MaxDD
+IMOEX CatBoost 0.003127 0.004228 0.870724 -0.001007 0.014824
+```
+
+## Лучшие модели по MASE на тикер
+
+```
+   Tk    Model     MAE     RMSE     MASE   CumRet    MaxDD
+IMOEX LSTM_att 0.00321 0.004189 0.869474 0.003496 0.013247
+```
+
+## Попарные DM-тесты по метрикам
+
+```
+   Tk    Model1    Model2 Metric   DM_stat    p_val
+IMOEX  CatBoost   SARIMAX    MAE -4.064346 0.000048
+IMOEX    Hybrid   SARIMAX    MAE -3.900707 0.000096
+IMOEX  LSTM_att   SARIMAX    MAE -3.878342 0.000105
+IMOEX LSTM_base   SARIMAX    MAE -3.807648 0.000140
+IMOEX        RF   SARIMAX    MAE -3.481422 0.000499
+IMOEX  LSTM_att    sNaive    MAE -2.895619 0.003784
+IMOEX     Naive   SARIMAX    MAE -2.882875 0.003941
+IMOEX  CatBoost    sNaive    MAE -2.862733 0.004200
+IMOEX    Hybrid    sNaive    MAE -2.814993 0.004878
+IMOEX LSTM_base    sNaive    MAE -2.768977 0.005623
+IMOEX  CatBoost        RF    MAE -2.176924 0.029486
+IMOEX    Hybrid        RF    MAE -2.045142 0.040841
+IMOEX  LSTM_att        RF    MAE -1.901361 0.057255
+IMOEX  CatBoost     Naive    MAE -1.795729 0.072538
+IMOEX LSTM_base        RF    MAE -1.686296 0.091739
+IMOEX     Naive    sNaive    MAE -1.631883 0.102704
+IMOEX  LSTM_att     Naive    MAE -1.629068 0.103299
+IMOEX   SARIMAX    sNaive    MAE  1.615389 0.106227
+IMOEX LSTM_base     Naive    MAE -1.577597 0.114658
+IMOEX        RF    sNaive    MAE -1.553729 0.120249
+IMOEX    Hybrid     Naive    MAE -1.453483 0.146090
+IMOEX  CatBoost LSTM_base    MAE -0.973110 0.330498
+IMOEX  CatBoost    Hybrid    MAE -0.932838 0.350903
+IMOEX  LSTM_att LSTM_base    MAE -0.606534 0.544160
+IMOEX  CatBoost  LSTM_att    MAE -0.521302 0.602156
+IMOEX    Hybrid  LSTM_att    MAE  0.356209 0.721684
+IMOEX     Naive        RF    MAE -0.245223 0.806283
+IMOEX    Hybrid LSTM_base    MAE -0.153547 0.877967
+IMOEX  LSTM_att LSTM_base   MAPE -2.499587 0.012434
+IMOEX    Hybrid     Naive   MAPE -2.482082 0.013062
+IMOEX  CatBoost     Naive   MAPE -2.460389 0.013879
+IMOEX    Hybrid        RF   MAPE -2.318005 0.020449
+IMOEX     Naive        RF   MAPE  2.141703 0.032217
+IMOEX  LSTM_att     Naive   MAPE -2.058004 0.039590
+IMOEX  CatBoost LSTM_base   MAPE -2.025847 0.042781
+IMOEX    Hybrid LSTM_base   MAPE -1.992599 0.046305
+IMOEX  LSTM_att   SARIMAX   MAPE -1.917109 0.055224
+IMOEX    Hybrid   SARIMAX   MAPE -1.899713 0.057471
+IMOEX  CatBoost   SARIMAX   MAPE -1.899473 0.057502
+IMOEX LSTM_base   SARIMAX   MAPE -1.883402 0.059646
+IMOEX        RF   SARIMAX   MAPE -1.856511 0.063381
+IMOEX  CatBoost    Hybrid   MAPE  1.760861 0.078262
+IMOEX     Naive   SARIMAX   MAPE -1.690761 0.090882
+IMOEX    Hybrid    sNaive   MAPE -1.686741 0.091653
+IMOEX    Hybrid  LSTM_att   MAPE -1.644058 0.100164
+IMOEX  CatBoost    sNaive   MAPE -1.572933 0.115734
+IMOEX   SARIMAX    sNaive   MAPE  1.523769 0.127567
+IMOEX        RF    sNaive   MAPE -1.516539 0.129383
+IMOEX LSTM_base        RF   MAPE  1.505736 0.132135
+IMOEX  LSTM_att    sNaive   MAPE -1.456887 0.145148
+IMOEX  CatBoost  LSTM_att   MAPE -1.404894 0.160053
+IMOEX LSTM_base     Naive   MAPE -1.323242 0.185755
+IMOEX LSTM_base    sNaive   MAPE -1.221520 0.221889
+IMOEX  LSTM_att        RF   MAPE  0.927861 0.353480
+IMOEX     Naive    sNaive   MAPE -0.627475 0.530348
+IMOEX  CatBoost        RF   MAPE  0.205009 0.837565
+IMOEX  LSTM_att LSTM_base  MDAPE -2.499587 0.012434
+IMOEX    Hybrid     Naive  MDAPE -2.482082 0.013062
+IMOEX  CatBoost     Naive  MDAPE -2.460389 0.013879
+IMOEX    Hybrid        RF  MDAPE -2.318005 0.020449
+IMOEX     Naive        RF  MDAPE  2.141703 0.032217
+IMOEX  LSTM_att     Naive  MDAPE -2.058004 0.039590
+IMOEX  CatBoost LSTM_base  MDAPE -2.025847 0.042781
+IMOEX    Hybrid LSTM_base  MDAPE -1.992599 0.046305
+IMOEX  LSTM_att   SARIMAX  MDAPE -1.917109 0.055224
+IMOEX    Hybrid   SARIMAX  MDAPE -1.899713 0.057471
+IMOEX  CatBoost   SARIMAX  MDAPE -1.899473 0.057502
+IMOEX LSTM_base   SARIMAX  MDAPE -1.883402 0.059646
+IMOEX        RF   SARIMAX  MDAPE -1.856511 0.063381
+IMOEX  CatBoost    Hybrid  MDAPE  1.760861 0.078262
+IMOEX     Naive   SARIMAX  MDAPE -1.690761 0.090882
+IMOEX    Hybrid    sNaive  MDAPE -1.686741 0.091653
+IMOEX    Hybrid  LSTM_att  MDAPE -1.644058 0.100164
+IMOEX  CatBoost    sNaive  MDAPE -1.572933 0.115734
+IMOEX   SARIMAX    sNaive  MDAPE  1.523769 0.127567
+IMOEX        RF    sNaive  MDAPE -1.516539 0.129383
+IMOEX LSTM_base        RF  MDAPE  1.505736 0.132135
+IMOEX  LSTM_att    sNaive  MDAPE -1.456887 0.145148
+IMOEX  CatBoost  LSTM_att  MDAPE -1.404894 0.160053
+IMOEX LSTM_base     Naive  MDAPE -1.323242 0.185755
+IMOEX LSTM_base    sNaive  MDAPE -1.221520 0.221889
+IMOEX  LSTM_att        RF  MDAPE  0.927861 0.353480
+IMOEX     Naive    sNaive  MDAPE -0.627475 0.530348
+IMOEX  CatBoost        RF  MDAPE  0.205009 0.837565
+IMOEX  CatBoost   SARIMAX   RMSE -3.812891 0.000137
+IMOEX    Hybrid   SARIMAX   RMSE -3.810671 0.000139
+IMOEX  LSTM_att   SARIMAX   RMSE -3.793766 0.000148
+IMOEX LSTM_base   SARIMAX   RMSE -3.749136 0.000177
+IMOEX        RF   SARIMAX   RMSE -3.623574 0.000291
+IMOEX     Naive   SARIMAX   RMSE -3.328312 0.000874
+IMOEX  LSTM_att        RF   RMSE -1.983338 0.047330
+IMOEX    Hybrid        RF   RMSE -1.983129 0.047353
+IMOEX  LSTM_att     Naive   RMSE -1.964496 0.049473
+IMOEX  CatBoost        RF   RMSE -1.954035 0.050697
+IMOEX  CatBoost     Naive   RMSE -1.909121 0.056246
+IMOEX LSTM_base     Naive   RMSE -1.886888 0.059175
+IMOEX LSTM_base        RF   RMSE -1.839878 0.065786
+IMOEX    Hybrid     Naive   RMSE -1.833571 0.066718
+IMOEX  LSTM_att    sNaive   RMSE -1.683836 0.092213
+IMOEX    Hybrid    sNaive   RMSE -1.655420 0.097839
+IMOEX LSTM_base    sNaive   RMSE -1.646436 0.099674
+IMOEX  CatBoost    sNaive   RMSE -1.641550 0.100683
+IMOEX   SARIMAX    sNaive   RMSE  1.458202 0.144785
+IMOEX     Naive    sNaive   RMSE -1.299172 0.193885
+IMOEX        RF    sNaive   RMSE -1.081328 0.279551
+IMOEX    Hybrid  LSTM_att   RMSE  0.679793 0.496635
+IMOEX     Naive        RF   RMSE -0.670138 0.502770
+IMOEX  LSTM_att LSTM_base   RMSE -0.669215 0.503359
+IMOEX  CatBoost  LSTM_att   RMSE  0.444117 0.656958
+IMOEX  CatBoost LSTM_base   RMSE -0.304416 0.760811
+IMOEX  CatBoost    Hybrid   RMSE -0.138068 0.890186
+IMOEX    Hybrid LSTM_base   RMSE -0.097747 0.922133
+IMOEX    Hybrid     Naive  SMAPE  2.949115 0.003187
+IMOEX    Hybrid    sNaive  SMAPE  2.940498 0.003277
+IMOEX        RF    sNaive  SMAPE  2.024715 0.042897
+IMOEX  CatBoost    Hybrid  SMAPE -2.017708 0.043622
+IMOEX    Hybrid  LSTM_att  SMAPE  1.908960 0.056267
+IMOEX     Naive        RF  SMAPE -1.867660 0.061810
+IMOEX    Hybrid LSTM_base  SMAPE  1.859388 0.062972
+IMOEX    Hybrid   SARIMAX  SMAPE  1.788404 0.073711
+IMOEX    Hybrid        RF  SMAPE  1.494215 0.135119
+IMOEX  LSTM_att     Naive  SMAPE  1.342926 0.179296
+IMOEX   SARIMAX    sNaive  SMAPE  1.281687 0.199952
+IMOEX  CatBoost    sNaive  SMAPE  1.249736 0.211396
+IMOEX     Naive   SARIMAX  SMAPE -1.217453 0.223432
+IMOEX  CatBoost     Naive  SMAPE  1.185801 0.235701
+IMOEX  LSTM_att    sNaive  SMAPE  1.165148 0.243959
+IMOEX LSTM_base     Naive  SMAPE  1.128232 0.259222
+IMOEX LSTM_base    sNaive  SMAPE  1.003635 0.315555
+IMOEX LSTM_base        RF  SMAPE -0.707357 0.479344
+IMOEX  CatBoost        RF  SMAPE -0.560288 0.575283
+IMOEX        RF   SARIMAX  SMAPE  0.504526 0.613892
+IMOEX  LSTM_att        RF  SMAPE -0.418513 0.675572
+IMOEX  LSTM_att LSTM_base  SMAPE  0.387538 0.698358
+IMOEX LSTM_base   SARIMAX  SMAPE -0.227578 0.819974
+IMOEX  CatBoost LSTM_base  SMAPE  0.177135 0.859402
+IMOEX  CatBoost  LSTM_att  SMAPE -0.137291 0.890801
+IMOEX  CatBoost   SARIMAX  SMAPE -0.121757 0.903091
+IMOEX     Naive    sNaive  SMAPE -0.075007 0.940209
+IMOEX  LSTM_att   SARIMAX  SMAPE  0.020024 0.984024
+IMOEX  LSTM_att LSTM_base   WAPE -2.499587 0.012434
+IMOEX    Hybrid     Naive   WAPE -2.482082 0.013062
+IMOEX  CatBoost     Naive   WAPE -2.460389 0.013879
+IMOEX    Hybrid        RF   WAPE -2.318005 0.020449
+IMOEX     Naive        RF   WAPE  2.141703 0.032217
+IMOEX  LSTM_att     Naive   WAPE -2.058004 0.039590
+IMOEX  CatBoost LSTM_base   WAPE -2.025847 0.042781
+IMOEX    Hybrid LSTM_base   WAPE -1.992599 0.046305
+IMOEX  LSTM_att   SARIMAX   WAPE -1.917109 0.055224
+IMOEX    Hybrid   SARIMAX   WAPE -1.899713 0.057471
+IMOEX  CatBoost   SARIMAX   WAPE -1.899473 0.057502
+IMOEX LSTM_base   SARIMAX   WAPE -1.883402 0.059646
+IMOEX        RF   SARIMAX   WAPE -1.856511 0.063381
+IMOEX  CatBoost    Hybrid   WAPE  1.760861 0.078262
+IMOEX     Naive   SARIMAX   WAPE -1.690761 0.090882
+IMOEX    Hybrid    sNaive   WAPE -1.686741 0.091653
+IMOEX    Hybrid  LSTM_att   WAPE -1.644058 0.100164
+IMOEX  CatBoost    sNaive   WAPE -1.572933 0.115734
+IMOEX   SARIMAX    sNaive   WAPE  1.523769 0.127567
+IMOEX        RF    sNaive   WAPE -1.516539 0.129383
+IMOEX LSTM_base        RF   WAPE  1.505736 0.132135
+IMOEX  LSTM_att    sNaive   WAPE -1.456887 0.145148
+IMOEX  CatBoost  LSTM_att   WAPE -1.404894 0.160053
+IMOEX LSTM_base     Naive   WAPE -1.323242 0.185755
+IMOEX LSTM_base    sNaive   WAPE -1.221520 0.221889
+IMOEX  LSTM_att        RF   WAPE  0.927861 0.353480
+IMOEX     Naive    sNaive   WAPE -0.627475 0.530348
+IMOEX  CatBoost        RF   WAPE  0.205009 0.837565
+```
+
 ## Анализ важности факторов
 
 Средняя значимость признаков усреднена по фолдам и моделям (RF, CatBoost). Список ограничен десятью ключевыми факторами.
@@ -44,6 +245,14 @@ MACD_SIGNAL    0.021320
 ## Временные ряды топ‑5 индикаторов
 
 ![Value](outputs/reports/indicator_series_Value.png)
+
+![RSI_50](outputs/reports/indicator_series_RSI_50.png)
+
+![ROC_10](outputs/reports/indicator_series_ROC_10.png)
+
+![MACD_DIFF](outputs/reports/indicator_series_MACD_DIFF.png)
+
+![CCI_20](outputs/reports/indicator_series_CCI_20.png)
 
 ![StochK](outputs/reports/indicator_series_StochK.png)
 
@@ -165,11 +374,13 @@ mean_structural_shift_pct  0.836874
 
 ## Факт и прогноз на всём горизонте (все фолды)
 
-![IMOEX_full_CatBoost.png](outputs_logret/reports/IMOEX_full_CatBoost.png)
-
 ![IMOEX_full_LSTM_att.png](outputs_logret/reports/IMOEX_full_LSTM_att.png)
 
+![IMOEX_full_CatBoost.png](outputs_logret/reports/IMOEX_full_CatBoost.png)
+
 ![IMOEX_full_Hybrid.png](outputs_logret/reports/IMOEX_full_Hybrid.png)
+
+![IMOEX_full_SARIMAX.png](outputs_logret/reports/IMOEX_full_SARIMAX.png)
 
 ## Кластеризация режимов по тикерам
 

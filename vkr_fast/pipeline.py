@@ -43,6 +43,8 @@ from .analysis import chain_growth_report, cluster_regimes_for_ticker
 
 DM_METRICS = ("mae", "rmse", "mape", "wape", "smape", "mdape")
 
+PLOT_MODELS = ("LSTM_att", "CatBoost", "Hybrid", "SARIMAX")
+
 
 def _per_point_losses(y_true: np.ndarray, y_pred: np.ndarray, eps: float = 1e-8) -> Dict[str, np.ndarray]:
     """Compute per-point losses for metrics used in DM tests."""
@@ -369,8 +371,11 @@ def run_pipeline(
                 if use_garch and (sigma_tr is not None) and (sigma_te is not None):
                     extra_tr.append(sigma_tr[:, None])
                     extra_te.append(sigma_te[:, None])
-                Xtr_h = np.hstack([X_trs_used, *extra_tr])
-                Xte_h = np.hstack([X_tes_used, *extra_te])
+                Xtr_h_raw = np.hstack([X_trs_used, *extra_tr])
+                Xte_h_raw = np.hstack([X_tes_used, *extra_te])
+                hsc = StandardScaler().fit(Xtr_h_raw)
+                Xtr_h = hsc.transform(Xtr_h_raw)
+                Xte_h = hsc.transform(Xte_h_raw)
                 seq_tr_h = _build_sequences(Xtr_h, win)
                 seq_te_h = _build_sequences(Xte_h, win)
 
@@ -496,6 +501,91 @@ def run_pipeline(
                 econ_rows.append([tk, fold, name, eq[-1] - 1, dd.max()])
 
             logger.info("   … fold готов")
+
+            # Full-period predictions (train+test) for plotting/exports
+            X_all = df[feat_cols].values.astype("float32")
+            y_all = df["y"].values.astype("float32")
+            X_all_s = np.nan_to_num(xsc.transform(X_all), nan=0.0)
+            y_all_z = ysc.transform(y_all.reshape(-1, 1)).ravel()
+            # Если добавляли sigma как признак, для полноты сюда можно подать те же признаки.
+            # Без GARCH оставляем исходную матрицу.
+            if use_garch and garch_mode == "feature" and (sigma_tr is not None) and (sigma_te is not None):
+                sigma_all = np.concatenate([sigma_tr, sigma_te])
+                X_all_s_used = np.hstack([X_all_s, sigma_all[:, None]])
+            else:
+                X_all_s_used = X_all_s
+
+            full_preds = {}
+            sar_full = np.full(len(y_all), np.nan, dtype=float)
+            try:
+                # In-sample часть
+                sar_ins = np.asarray(sar.predict(start=0, end=len(y_tr) - 1)).ravel()
+                sar_full[: len(sar_ins)] = sar_ins
+                # Out-of-sample часть требует exog только на горизонт прогноза
+                exog_fc = X_all_s_used[len(y_tr) :]
+                sar_fc = np.asarray(
+                    sar.predict(start=len(y_tr), end=len(y_all) - 1, exog=exog_fc)
+                ).ravel()
+                sar_full[len(y_tr) :] = sar_fc
+            except Exception as exc:  # pragma: no cover — логируем, но не падаем
+                logger.exception("[SARIMAX] full predict failed: %s", exc)
+            full_preds["SARIMAX"] = sar_full
+
+            # RF / CatBoost
+            try:
+                full_preds["RF"] = rf.predict(X_all_s_used)
+            except Exception as exc:
+                logger.exception("[RF] full predict failed: %s", exc)
+                full_preds["RF"] = np.full(len(y_all), np.nan, dtype=float)
+            if use_catboost and p_cb is not None:
+                try:
+                    full_preds["CatBoost"] = cb.predict(X_all_s_used)
+                except Exception as exc:
+                    logger.exception("[CatBoost] full predict failed: %s", exc)
+                    full_preds["CatBoost"] = np.full(len(y_all), np.nan, dtype=float)
+
+            # LSTM base/att + Hybrid
+            if use_tf and p_lb is not None:
+                seq_all = _build_sequences(X_all_s_used, win)
+
+                def _pad(seq_preds):
+                    out = np.full(len(y_all), np.nan, dtype=float)
+                    out[win:] = ysc.inverse_transform(seq_preds.reshape(-1, 1)).ravel()
+                    return out
+
+                try:
+                    full_preds["LSTM_base"] = _pad(lb.predict(seq_all).astype("float32"))
+                except Exception as exc:
+                    logger.exception("[LSTM_base] full predict failed: %s", exc)
+                    full_preds["LSTM_base"] = np.full(len(y_all), np.nan, dtype=float)
+                try:
+                    full_preds["LSTM_att"] = _pad(la.predict(seq_all).astype("float32"))
+                except Exception as exc:
+                    logger.exception("[LSTM_att] full predict failed: %s", exc)
+                    full_preds["LSTM_att"] = np.full(len(y_all), np.nan, dtype=float)
+
+                # Hybrid full: need SARIMAX forecast as extra feature
+                try:
+                    extra_full = [np.nan_to_num(full_preds["SARIMAX"], nan=0.0)[:, None]]
+                    X_all_h_raw = np.hstack([X_all_s_used, *extra_full])
+                    X_all_h_raw = np.nan_to_num(X_all_h_raw, nan=0.0)
+                    if 'hsc' in locals():
+                        X_all_h = hsc.transform(X_all_h_raw)
+                    else:
+                        X_all_h = X_all_h_raw
+                    seq_all_h = _build_sequences(X_all_h, win)
+                    full_preds["Hybrid"] = _pad(lh.predict(seq_all_h).astype("float32"))
+                except Exception as exc:
+                    logger.exception("[Hybrid] full predict failed: %s", exc)
+                    full_preds["Hybrid"] = np.full(len(y_all), np.nan, dtype=float)
+
+            # Export full preds per fold
+            os.makedirs(f"{paths.out_dir}/full_preds", exist_ok=True)
+            fp_df = pd.DataFrame({"Datetime": df[time_col], "y_true": y_all})
+            for name in PLOT_MODELS:
+                if name in full_preds:
+                    fp_df[name] = full_preds[name]
+            fp_df.to_csv(f"{paths.out_dir}/full_preds/{tk}_f{fold}.csv", index=False)
 
             # Generate detailed GOST-styled reports per fold
             try:
