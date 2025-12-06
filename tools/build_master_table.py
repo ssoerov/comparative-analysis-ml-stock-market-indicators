@@ -60,6 +60,9 @@ def _load_predictions(out_dir: str, suffix: str) -> Dict[str, pd.Series]:
     for fname in sorted(os.listdir(pred_dir)):
         if not fname.endswith(".csv") or "_f" not in fname:
             continue
+        if "_full" in fname:
+            # *_full.csv содержат лишь прогнозный отрезок — пропускаем, чтобы оставить полный ряд
+            continue
         fold = fname.split("_f")[1].split(".")[0]
         df = pd.read_csv(os.path.join(pred_dir, fname), parse_dates=["Datetime"])
         df.set_index("Datetime", inplace=True)
