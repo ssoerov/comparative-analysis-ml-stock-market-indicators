@@ -26,7 +26,8 @@ class TimeParams:
     window: int = 60
     start_raw: pd.Timestamp = pd.Timestamp("2023-01-03", tz="UTC")
     end_raw: pd.Timestamp = pd.Timestamp("2025-04-01", tz="UTC")
-    period_start: pd.Timestamp = pd.Timestamp("2023-04-03", tz="UTC")
+    # сдвигаем старт к первой точке, где экзогенные факторы (Brent/USDRUB) доступны
+    period_start: pd.Timestamp = pd.Timestamp("2023-10-30 10:00", tz="UTC")
     period_end: pd.Timestamp = pd.Timestamp("2025-04-03", tz="UTC")
 
 

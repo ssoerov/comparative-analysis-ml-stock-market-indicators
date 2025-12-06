@@ -28,7 +28,7 @@ from .config import (
     cpu_count_limited,
     default_logger,
 )
-from .data import yahoo_csv, keyrate_series, fetch_moex
+from .data import yahoo_csv, fetch_moex
 from .features import add_indicators, make_lags
 from .models import (
     fit_sarimax,
@@ -114,7 +114,6 @@ def _load_all_data(paths: Paths, timep: TimeParams, cpu: int, logger, offline: b
 
     brent = yahoo_csv(paths.data_dir, "Brent_yahoo_1h_2023-01-01_2025-04-01 (1).csv")
     usdr = yahoo_csv(paths.data_dir, "USD_RUB_yahoo_1h_2023-01-01_2025-04-01.csv")
-    krate = keyrate_series()
     logger.info("✓ Данные загружены за %.1f сек.", (pd.Timestamp.utcnow() - t0).total_seconds())
 
     raw = {}
@@ -125,7 +124,6 @@ def _load_all_data(paths: Paths, timep: TimeParams, cpu: int, logger, offline: b
         ext = pd.DataFrame(index=idx)
         ext["Brent"] = brent["Close"].reindex(idx).ffill()
         ext["USD"] = usdr["Close"].reindex(idx).ffill()
-        ext["KeyRate"] = krate["KeyRate"].reindex(idx).ffill()
         ext.bfill(limit=1, inplace=True)
         joined = base.join(ext, how="left")
         raw[tk] = joined.loc[period_slice]

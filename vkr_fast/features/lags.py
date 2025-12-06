@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 
 
-EXOG_COLUMNS = ("Brent", "USD", "KeyRate")
+# Экзогенные факторы, которые действительно есть на часовом таймфрейме
+EXOG_COLUMNS = ("Brent", "USD")
 
 
 def make_lags(df: pd.DataFrame, window: int, exog_lags: int = 24, target: str = "dclose") -> pd.DataFrame:
