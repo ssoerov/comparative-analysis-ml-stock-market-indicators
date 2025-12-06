@@ -34,12 +34,21 @@ def _load_raw(paths: Paths, timep: TimeParams) -> pd.DataFrame:
     return joined.loc[period_slice]
 
 
-def _timeline_from_full_preds(out_dir: str) -> pd.DatetimeIndex:
-    full_path = os.path.join(out_dir, "full_preds", "IMOEX_f0.csv")
-    if os.path.exists(full_path):
-        df = pd.read_csv(full_path, parse_dates=["Datetime"])
-        return pd.to_datetime(df["Datetime"])
-    return pd.DatetimeIndex([])
+def _timeline_from_full_preds(*dirs: str) -> pd.DatetimeIndex:
+    """Собираем объединённую временную ось по всем full_preds из заданных каталогов."""
+    idx_list = []
+    for out_dir in dirs:
+        full_dir = os.path.join(out_dir, "full_preds")
+        if not os.path.isdir(full_dir):
+            continue
+        for fname in os.listdir(full_dir):
+            if not fname.endswith(".csv") or "_f" not in fname:
+                continue
+            df = pd.read_csv(os.path.join(full_dir, fname), parse_dates=["Datetime"])
+            idx_list.append(pd.to_datetime(df["Datetime"]))
+    if not idx_list:
+        return pd.DatetimeIndex([])
+    return pd.DatetimeIndex(sorted(pd.unique(pd.concat(idx_list))))
 
 
 def _load_predictions(out_dir: str, suffix: str) -> Dict[str, pd.Series]:
@@ -77,10 +86,11 @@ def build_master(out_dir: str, dest: str) -> None:
     feat_d.set_index("Datetime", inplace=True)
     feat_l.set_index("Datetime", inplace=True)
 
-    timeline = _timeline_from_full_preds(out_dir)
-    if timeline.empty:
-        timeline = feat_d.index
-    timeline = pd.DatetimeIndex(sorted(timeline.unique()))
+    # объединяем временные оси dclose/logret full_preds и исходных фич
+    tl = _timeline_from_full_preds(out_dir, "outputs_logret", out_dir.replace("outputs", "outputs_logret"))
+    if tl.empty:
+        tl = feat_d.index
+    timeline = pd.DatetimeIndex(sorted(pd.unique(tl.union(feat_d.index).union(feat_l.index))))
 
     master = pd.DataFrame(index=timeline)
 
@@ -89,6 +99,8 @@ def build_master(out_dir: str, dest: str) -> None:
     master[common_cols] = feat_d.reindex(timeline)[common_cols]
     master["y_dclose"] = feat_d.reindex(timeline)["y"]
     master["y_logret"] = feat_l.reindex(timeline)["y"]
+    master[common_cols] = master[common_cols].ffill()
+    master[["y_dclose", "y_logret"]] = master[["y_dclose", "y_logret"]].ffill()
 
     # Цепные и базисные показатели по Close
     close = master["Close"]
