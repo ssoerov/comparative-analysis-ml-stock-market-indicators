@@ -21,7 +21,8 @@ def make_lags(df: pd.DataFrame, window: int, exog_lags: int = 24, target: str = 
     out = df.copy()
     target = target.lower()
     if target == "logret":
-        out["y"] = (out["Close"].shift(-1) / out["Close"]).apply(lambda x: pd.NA if pd.isna(x) else float(np.log(x)))
+        # Логарифмическая доходность t = Close_t / Close_{t-1}
+        out["y"] = np.log(out["Close"] / out["Close"].shift(1))
     else:
         out["y"] = out["Close"].diff().shift(-1)
 
