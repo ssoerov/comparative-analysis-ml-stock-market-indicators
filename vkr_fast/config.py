@@ -52,6 +52,7 @@ class LSTMParams:
 
 TICKERS: Dict[str, Tuple[str, str, str]] = {
     "IMOEX": ("index", "MOEX", "IMOEX"),
+    "RTSI": ("index", "RTSI", "RTSI"),
 }
 
 

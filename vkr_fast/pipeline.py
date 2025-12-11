@@ -205,7 +205,7 @@ def run_pipeline(
             except Exception as exc:
                 logger.warning("[%s] Цепной анализ не построен: %s", tk, exc)
             try:
-                cluster_regimes_for_ticker(tk, raw[tk], os.path.join(paths.out_dir, "clustering"))
+                cluster_regimes_for_ticker(tk, raw[tk], os.path.join(paths.out_dir, "clustering"), k=4)
             except Exception as exc:
                 logger.warning("[%s] Кластеризация не выполнена: %s", tk, exc)
             analysis_done.add(tk)
